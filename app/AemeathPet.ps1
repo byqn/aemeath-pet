@@ -1164,9 +1164,13 @@ try {
     }
 
     # ── 窗口 ──
-    # 显示尺寸固定按交付格式的 192x208 乘以缩放；高清图集在这个尺寸下接近 1:1，所以清晰
-    $displayW = $BaseCellW * $Scale
-    $displayH = $BaseCellH * $Scale
+    # 显示尺寸按交付格式的 192x208 乘以缩放；高清图集在这个尺寸下接近 1:1，所以清晰
+    # 用 script 作用域，运行时的缩放功能才能改到它们
+    $script:scale = $Scale
+    $script:displayW = $BaseCellW * $script:scale
+    $script:displayH = $BaseCellH * $script:scale
+    $displayW = $script:displayW
+    $displayH = $script:displayH
 
     $window = New-Object System.Windows.Window
     $window.WindowStyle = [System.Windows.WindowStyle]::None
@@ -1355,6 +1359,60 @@ try {
         return $script:centerCache
     }
 
+    # ── 电子幽灵模式：用运行时效果实现，不需要新素材 ──
+    $script:ghostMode = $false
+    $script:ghostPhase = 0.0
+    $script:ghostFlicker = 0
+    $script:ghostGlow = $null
+    $script:ghostTransform = $null
+
+    function Set-GhostMode([bool]$On) {
+        $script:ghostMode = $On
+        if ($null -eq $script:ghostTransform) {
+            $script:ghostTransform = New-Object System.Windows.Media.TranslateTransform
+            $image.RenderTransform = $script:ghostTransform
+        }
+        if ($On) {
+            # 青色辉光：ShadowDepth=0 的投影就相当于外发光
+            $glow = New-Object System.Windows.Media.Effects.DropShadowEffect
+            $glow.Color = [System.Windows.Media.Color]::FromRgb(90, 230, 255)
+            $glow.BlurRadius = 26
+            $glow.ShadowDepth = 0
+            $glow.Opacity = 0.95
+            $script:ghostGlow = $glow
+            $image.Effect = $glow
+            $image.Opacity = 0.78
+            Play-Sound 'ghost'
+            Show-Bubble '电子幽灵形态…' 5000
+        }
+        else {
+            $image.Effect = $null
+            $image.Opacity = 1.0
+            $script:ghostTransform.X = 0
+            $script:ghostTransform.Y = 0
+            $script:ghostGlow = $null
+        }
+        Write-Log "ghost mode = $On"
+    }
+
+    function Update-GhostEffect {
+        if (-not $script:ghostMode) { return }
+        $script:ghostPhase += 0.16
+        # 上下漂浮
+        $script:ghostTransform.Y = [Math]::Sin($script:ghostPhase) * 5
+        $script:ghostTransform.X = [Math]::Sin($script:ghostPhase * 0.6) * 2
+        # 呼吸式明暗
+        $base = 0.72 + 0.16 * [Math]::Sin($script:ghostPhase * 0.5)
+        # 偶发闪烁
+        if ($script:ghostFlicker -gt 0) {
+            $script:ghostFlicker--
+            $base = 0.28
+        }
+        elseif ($script:random.Next(0, 220) -lt 1) {
+            $script:ghostFlicker = 2
+        }
+        $image.Opacity = [Math]::Max(0.2, [Math]::Min(0.95, $base))
+    }
     # ── 表情编排：用已有的帧组合出新动作，不需要重新生成素材 ──
     $script:emoteQueue = @()
     $script:emoteIndex = 0
@@ -1410,6 +1468,18 @@ try {
                 foreach ($c in 0..7) { [void]$steps.Add(@{ row = 9; col = $c; ticks = 2 }) }
                 foreach ($c in 0..7) { [void]$steps.Add(@{ row = 10; col = $c; ticks = 2 }) }
             }
+            'haunt' {
+                # 幽灵飘：目光缓慢扫过一圈，配合幽灵模式的漂浮与辉光
+                foreach ($c in 0..7) { [void]$steps.Add(@{ row = 9; col = $c; ticks = 3 }) }
+                foreach ($c in 0..7) { [void]$steps.Add(@{ row = 10; col = $c; ticks = 3 }) }
+            }
+            'glitch' {
+                # 数据抖动：在几个方向之间快速跳
+                foreach ($i in 1..6) {
+                    [void]$steps.Add(@{ row = 9; col = $script:random.Next(0, 8); ticks = 1 })
+                    [void]$steps.Add(@{ row = 10; col = $script:random.Next(0, 8); ticks = 1 })
+                }
+            }
             default { return }
         }
         $script:emoteQueue = $steps.ToArray()
@@ -1425,6 +1495,8 @@ try {
             'cute' { Play-Sound 'hello' }
             'dance' { Play-Sound 'jump' }
             'stretch' { Play-Sound 'chirp' }
+            'haunt' { Play-Sound 'ghost' }
+            'glitch' { Play-Sound 'ghost' }
         }
     }
 
@@ -1474,6 +1546,9 @@ try {
             else { Complete-AiRequest }
         }
         if ($script:codeRunning) { Complete-CodeRun }
+
+        # 幽灵模式的漂浮、辉光呼吸与偶发闪烁
+        if ($script:ghostMode) { Update-GhostEffect }
         if ($script:bubbleUntil -gt 0 -and [Environment]::TickCount -gt $script:bubbleUntil) {
             $script:bubbleUntil = 0
             if ($bubble.IsVisible) { $bubble.Hide() }
@@ -1583,7 +1658,7 @@ try {
         $dy = $cursor.Y - $center.Y
         $distance = [Math]::Sqrt($dx * $dx + $dy * $dy)
 
-        if ($script:followMouse -and $distance -gt ($displayH * 0.9)) {
+        if ($script:followMouse -and $distance -gt ($script:displayH * 0.9)) {
             Set-FrameInterval $LookFrameMs
             $angle = [Math]::Atan2($dx, -$dy) * 180.0 / [Math]::PI
             if ($angle -lt 0) { $angle += 360 }
@@ -1654,6 +1729,58 @@ try {
         }
         $script:dragging = $false
     })
+
+    # ── 设置持久化与运行时缩放 ──
+    $script:settingsPath = Join-Path $scriptRoot 'pet-settings.json'
+
+    function Get-PetSettings {
+        if (-not (Test-Path -LiteralPath $script:settingsPath -PathType Leaf)) { return $null }
+        try { return Get-Content -LiteralPath $script:settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json }
+        catch { Write-Log "settings 解析失败：$($_.Exception.Message)"; return $null }
+    }
+
+    function Save-PetSettings {
+        try {
+            [ordered]@{
+                scale            = $script:scale
+                roam             = [bool]$script:roam
+                sound            = [bool]$script:soundOn
+                speak            = [bool]$script:speakOn
+                clickShowsStatus = [bool]$script:clickShowsStatus
+                ghostMode        = [bool]$script:ghostMode
+                canEat           = [bool]$script:canEat
+                eatRealMode      = [bool]$script:eatRealMode
+            } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $script:settingsPath -Encoding UTF8
+        }
+        catch { Write-Log "settings 保存失败：$($_.Exception.Message)" }
+    }
+
+    function Apply-Scale([double]$NewScale, [switch]$Quiet) {
+        # 夹在 0.5 ~ 4 倍之间，并保持底部中心不动，缩放时她不会“跳”走
+        $s = [Math]::Round([Math]::Max(0.5, [Math]::Min(4.0, $NewScale)), 2)
+        if ([Math]::Abs($s - $script:scale) -lt 0.001) {
+            if (-not $Quiet) { Show-Bubble "已经是 $s 倍（范围 0.5 ~ 4）" 3000 }
+            return
+        }
+        $bottom = $window.Top + $window.Height
+        $centerX = $window.Left + $window.Width / 2
+        $script:scale = $s
+        $script:displayW = $BaseCellW * $s
+        $script:displayH = $BaseCellH * $s
+        $window.Width = $script:displayW
+        $window.Height = $script:displayH
+        $image.Width = $script:displayW
+        $image.Height = $script:displayH
+        $window.Left = $centerX - $script:displayW / 2
+        $window.Top = $bottom - $script:displayH
+        $script:centerCache = $null      # 跟随鼠标的距离阈值要按新尺寸重算
+        if (-not $Quiet) { Show-Bubble "大小：$s 倍" 3000 }
+        Save-PetSettings
+    }
+
+    function Step-Scale([double]$Factor) {
+        Apply-Scale ($script:scale * $Factor)
+    }
 
     # ── 菜单 ──
     $menu = New-Object System.Windows.Controls.ContextMenu
@@ -1737,6 +1864,12 @@ try {
     Add-MenuItem '卖个萌' { Start-Emote 'cute' } | Out-Null
     Add-MenuItem '跳支舞' { Start-Emote 'dance' } | Out-Null
     Add-MenuItem '伸个懒腰' { Start-Emote 'stretch' } | Out-Null
+    Add-MenuItem '幽灵飘一圈' { Start-Emote 'haunt' } | Out-Null
+    Add-MenuItem '数据抖动' { Start-Emote 'glitch' } | Out-Null
+    Add-MenuItem '电子幽灵模式' {
+        Set-GhostMode $ghostItem.IsChecked
+    } $true $script:ghostMode | Out-Null
+    $ghostItem = $menu.Items[$menu.Items.Count - 1]
     Add-MenuItem '去睡觉（点她唤醒）' { Start-Sleep2 } | Out-Null
     $menu.Items.Add((New-Object System.Windows.Controls.Separator)) | Out-Null
     Add-MenuItem '偷吃快捷方式' { $script:canEat = $eatItem.IsChecked } $true $script:canEat | Out-Null
@@ -1757,8 +1890,52 @@ try {
     $menu.Items.Add((New-Object System.Windows.Controls.Separator)) | Out-Null
     Add-MenuItem '看向鼠标' { $script:followMouse = -not $script:followMouse } | Out-Null
     Add-MenuItem '回到右下角' { $window.Left = $script:work.Right - $window.Width - 60; $window.Top = $script:floorTop } | Out-Null
+    Add-MenuItem '放大（滚轮上）' { Step-Scale 1.25 } | Out-Null
+    Add-MenuItem '缩小（滚轮下）' { Step-Scale 0.8 } | Out-Null
+    Add-MenuItem '恢复默认大小' { Apply-Scale 2.0 } | Out-Null
     Add-MenuItem '退出' { $window.Close() } | Out-Null
     $window.ContextMenu = $menu
+
+    # 滚轮缩放：鼠标在她身上滚即可（窗口获得焦点时生效）
+    $window.Add_MouseWheel({
+        if ($_.Delta -gt 0) { Step-Scale 1.25 } else { Step-Scale 0.8 }
+        $_.Handled = $true
+    })
+
+    # ── 载入上次保存的设置 ──
+    $saved = Get-PetSettings
+    if ($null -ne $saved) {
+        if ($saved.PSObject.Properties['sound'] -and -not $Mute) {
+            $script:soundOn = [bool]$saved.sound
+            $soundItem.IsChecked = $script:soundOn
+        }
+        if ($saved.PSObject.Properties['speak']) {
+            $script:speakOn = [bool]$saved.speak
+            $speakItem.IsChecked = $script:speakOn
+        }
+        if ($saved.PSObject.Properties['roam'] -and -not $NoRoam) {
+            $script:roam = [bool]$saved.roam
+            $roamItem.IsChecked = $script:roam
+        }
+        if ($saved.PSObject.Properties['clickShowsStatus']) {
+            $script:clickShowsStatus = [bool]$saved.clickShowsStatus
+            $clickStatusItem.IsChecked = $script:clickShowsStatus
+        }
+        if ($saved.PSObject.Properties['ghostMode'] -and [bool]$saved.ghostMode) {
+            $ghostItem.IsChecked = $true
+            Set-GhostMode $true
+        }
+        if ($saved.PSObject.Properties['canEat']) {
+            $script:canEat = [bool]$saved.canEat
+            $eatItem.IsChecked = $script:canEat
+        }
+        if ($saved.PSObject.Properties['eatRealMode']) {
+            $script:eatRealMode = [bool]$saved.eatRealMode
+            $realEatItem.IsChecked = $script:eatRealMode
+        }
+        if ($saved.PSObject.Properties['scale']) { Apply-Scale ([double]$saved.scale) -Quiet }
+        Write-Log "settings loaded: scale=$($script:scale) roam=$($script:roam) sound=$($script:soundOn)"
+    }
 
     if ($SelfTest) {
         for ($i = 0; $i -lt 12; $i++) { Update-Frame }
@@ -1779,7 +1956,7 @@ try {
         $bellyCount = (Get-BellyItems).Count
         # 表情编排自检：每种都排一遍，确认步数与用到的帧都在图集范围内
         $emoteReport = @()
-        foreach ($name in @('nod', 'shake', 'spin', 'cute', 'dance', 'stretch')) {
+        foreach ($name in @('nod', 'shake', 'spin', 'cute', 'dance', 'stretch', 'haunt', 'glitch')) {
             Start-Emote $name
             $bad = @($script:emoteQueue | Where-Object { $_.row -lt 0 -or $_.row -gt 10 -or $_.col -lt 0 -or $_.col -gt 7 })
             $emoteReport += "$name=$($script:emoteQueue.Count)步$(if ($bad.Count -gt 0) { '(越界!)' } else { '' })"
@@ -1794,7 +1971,7 @@ try {
         $engines = Get-CodeEngines
         $workspace = Get-AgentWorkspace
         $codeReport = "engines=$($engines.Count)[$($engines -join ' | ')] workspace_exists=$(Test-Path $workspace)"
-        "SELFTEST_OK atlas=$(Split-Path $atlasPath -Leaf) cell=${CellWidth}x${CellHeight} cards=$($cells.Length) sounds=$($players.Count) scale=$Scale walk_moved_px=$moved window=$($window.Width)x$($window.Height) ai=$($script:aiReady) bubble_ok=$([bool]$bubbleText) desktop_lnk=$shortcutCount belly=$bellyCount leftover_restored=$($script:leftoverRestored) usage='$(Get-UsageShort)' balance='$(Get-BalanceShort)' click_status=$($script:clickShowsStatus) emotes=[$($emoteReport -join ' ')] sleep_wake=$($sleepOk -and $wakeOk) code=$codeReport"
+        "SELFTEST_OK atlas=$(Split-Path $atlasPath -Leaf) cell=${CellWidth}x${CellHeight} cards=$($cells.Length) sounds=$($players.Count) scale=$($script:scale) disp=$($script:displayW)x$($script:displayH) walk_moved_px=$moved window=$($window.Width)x$($window.Height) ai=$($script:aiReady) bubble_ok=$([bool]$bubbleText) desktop_lnk=$shortcutCount belly=$bellyCount leftover_restored=$($script:leftoverRestored) usage='$(Get-UsageShort)' balance='$(Get-BalanceShort)' click_status=$($script:clickShowsStatus) emotes=[$($emoteReport -join ' ')] sleep_wake=$($sleepOk -and $wakeOk) code=$codeReport"
         exit 0
     }
 
@@ -1913,6 +2090,7 @@ try {
     $window.Add_Closed({
         Write-Log 'closed'
         $timer.Stop()
+        try { Save-PetSettings } catch { }
         # 退出前把肚子里的快捷方式还回去，绝不带走用户的东西
         try { Restore-Belly -Quiet | Out-Null } catch { Write-Log "exit restore failed: $($_.Exception.Message)" }
         try { if ($bubble.IsVisible) { $bubble.Close() } } catch { }
