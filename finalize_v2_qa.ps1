@@ -1,6 +1,10 @@
 [CmdletBinding()]
 param(
-    [string]$Python = $(if ($env:DSH_PYTHON) { $env:DSH_PYTHON } else { "C:\Users\32022\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe" })
+    [string]$Python = $(if ($env:DSH_PYTHON) { $env:DSH_PYTHON } else { "C:\Users\32022\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe" }),
+
+    # 单次 chroma 去污染的强度参数。默认值即技能原始设定；仅当校验残留极少量边缘像素时才需要调高。
+    [double]$DespillSpillTolerance = 0.15,
+    [double]$DespillStrength = 1
 )
 
 $ErrorActionPreference = "Stop"
@@ -82,6 +86,8 @@ Invoke-HatchTool "despill_chroma_edges.py" @(
     "--output", $atlasPng,
     "--webp-output", $atlasWebp,
     "--chroma-key", $chromaKey,
+    "--strength", "$DespillStrength",
+    "--spill-tolerance", "$DespillSpillTolerance",
     "--json-out", $despillReport
 )
 $despill = Get-Content -LiteralPath $despillReport -Raw -Encoding UTF8 | ConvertFrom-Json
