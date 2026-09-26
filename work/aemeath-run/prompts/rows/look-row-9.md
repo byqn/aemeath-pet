@@ -2,6 +2,28 @@ Create one horizontal look-direction strip for Codex pet `aemeath`, atlas row 9.
 
 Use the attached canonical base, completed standard contact sheet, layout guide, and approved four-cardinal strip for identity, scale, registration, spacing, direction semantics, and cross-row continuity. Read `qa/look-mechanics.md` and follow its pet-specific movement and eye/prop mechanics. The approved cardinal strip is authoritative for the up, screen-right, down, and screen-left pose families. Interpolate the intermediate directions as even 22.5-degree steps between those anchors.
 
+GAZE COMPASS LOCK — read this before anything else. This row is NOT a rotation of the character. The pet NEVER turns her body away from the viewer. The torso, shoulders, hips, skirt, arms, legs, and feet stay in exactly the same front-facing registration in all eight cells, and BOTH eyes stay visible in every cell. A previous attempt failed because the whole sprite rotated until the pet showed her back: do not repeat that. Any cell showing a side profile, a three-quarter body turn, the back of the head, or only one visible eye is wrong and must not be drawn.
+
+The only things that may change between cells: pupil/iris position inside the eye white, eyelid aperture, eyebrows, a small head yaw of at most about 20 degrees or a small head pitch, and a subtle upper-body lean.
+
+Per-cell gaze target — all eight cells stay front-facing with an unrotated body:
+
+- `000` — pupils at the TOP of the eye white, upper eyelids lifted, chin slightly raised: looking UP.
+- `022.5` — pupils high and a little toward the viewer's right.
+- `045` — pupils in the upper-right diagonal of the eye white.
+- `067.5` — pupils toward the viewer's right and slightly above centre; nose direction leans right.
+- `090` — pupils at the RIGHT edge of the eye white, clearly past the centre line; nose direction clearly toward the viewer's right.
+- `112.5` — pupils toward the viewer's right and slightly below centre.
+- `135` — pupils in the lower-right diagonal of the eye white.
+- `157.5` — pupils near the BOTTOM of the eye white and still slightly toward the viewer's right, upper eyelids lowered: almost looking DOWN, never facing away.
+
+SLOT SPACING LOCK — a previous attempt failed because the first three poses touched each other, so the deterministic cropper could only find 6 separated groups instead of 8. Every pair of neighbouring poses must be separated by a continuous vertical band of pure magenta that runs the FULL height of the canvas, with no hair, sleeve, skirt, or outline ever crossing it.
+
+- The canvas holds 8 slots of 192 pixels each. Each pose — including all hair — must be at most 120 pixels wide (about 60 percent of its slot), with at least 36 pixels of empty magenta on each side inside its own slot and at least 40 pixels of pure magenta between neighbouring poses.
+- Leave at least a quarter of each slot width as empty magenta, split evenly on the left and right of the pose.
+- Long hair must be drawn tucked in and compact; it may never extend sideways into the neighbouring slot.
+- No pose may overlap, touch, or share any pixel with its neighbour.
+
 COHERENT SYNTHESIS LOCK: produce one unified eight-pose row. Do not paste, tile, or independently restyle individual cells. Every final cell must be drawn together with the same face construction, body proportions, line/render quality, lighting, materials, scale, baseline, and registration.
 
 Output exactly 8 complete full-body frames in this exact left-to-right order: 000, 022.5, 045, 067.5, 090, 112.5, 135, 157.5. Degrees are clockwise: 000 is up, 090 right, 180 down, and 270 left. Neutral/front is not part of this row.

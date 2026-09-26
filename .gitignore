@@ -25,6 +25,18 @@ probe_*.py
 verify_new_key.py
 try_planb_key.py
 
+# ── 应用本地配置：可能存有用户自己的 API 密钥，禁止入库 ──
+app/ai-config.json
+app/*.backup.json
+app/aemeath-pet.log
+
+# ── 可由脚本重建的大体积派生文件 ──
+work/aemeath-run/frames/
+work/aemeath-run/qa/*.png
+work/aemeath-run/qa/previews/
+work/aemeath-run/qa/rejected/
+app/previews/
+
 # ── 本地环境 ──
 .venv/
 venv/

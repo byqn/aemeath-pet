@@ -11,7 +11,9 @@ Animation continuity: keep apparent pet scale and baseline stable within the row
 State action: Working loop: focused active-task processing, thinking, typing, scanning, or effortful concentration; not literal foot-running, jogging, sprinting, treadmill motion, raised knees, long steps, pumping arms, or directional travel.
 
 State requirements:
-- Show the pet actively working or processing, as if running a task: focused posture, busy hands or paws, purposeful bobbing, thinking motion, tool or prop motion only if already part of the pet identity, or other non-locomotion activity.
+- Show the pet actively working or processing, as if running a task: focused posture, busy hands or paws, purposeful bobbing, thinking motion, or other non-locomotion activity.
 - Do not show literal foot-running, jogging, sprinting, treadmill motion, raised knees, long steps, pumping arms, directional travel, speed lines, dust clouds, floor shadows, motion trails, or detached motion effects.
+- CRITICAL: keep both hands completely EMPTY in every frame. No books, tablets, papers, documents, clipboards, magnifiers, pens, pencils, tools, furniture, desks, stacks, boxes, thought bubbles, speech bubbles, icons, sparkles, or any other prop, accessory, or detached object may appear anywhere in the frame. Nothing may be added in front of, behind, beside, or above the pet.
+- Keep the feet, body height, and apparent scale identical in all 6 frames: only small internal posture changes, gentle breathing, blinking, and subtle empty-handed gesture motion are allowed. The pet must never sit down, crouch lower, or change its vertical position.
 
 Clean extraction: crisp opaque edges, safe padding, no scenery, text, guide marks, checkerboard, shadows, glows, motion blur, speed lines, dust, detached effects, stray pixels, or chroma-key colors inside the pet.

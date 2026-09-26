@@ -1,0 +1,19 @@
+﻿{
+    "job_id":  "waiting",
+    "mode":  "edit",
+    "dry_run":  false,
+    "retried_bad_request":  false,
+    "output_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\decoded\\waiting.png",
+    "prompt_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\prompts\\rows\\waiting.md",
+    "effective_prompt_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\prompts\\rows\\waiting.md",
+    "input_images":  [
+                         "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\references\\layout-guides\\waiting.png",
+                         "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\references\\canonical-base.png"
+                     ],
+    "qa_outputs":  [
+                       "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\qa\\rows\\waiting\\review.json"
+                   ],
+    "cli_exit_code":  0,
+    "completed_at":  "2026-09-26T12:55:01.8590012Z",
+    "note":  "必须完成技能规定的视觉审核后再复制 canonical base / 手动更新 imagegen-jobs.json；脚本不会自动标记 complete。"
+}

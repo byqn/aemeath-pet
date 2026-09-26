@@ -1,7 +1,7 @@
-﻿{
+{
     "job_id":  "base",
     "mode":  "generate",
-    "dry_run":  true,
+    "dry_run":  false,
     "retried_bad_request":  false,
     "output_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\decoded\\base.png",
     "prompt_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\prompts\\base-pet.md",
@@ -13,6 +13,6 @@
 
                    ],
     "cli_exit_code":  0,
-    "completed_at":  "2026-09-26T11:43:49.3102907Z",
-    "note":  "CLI 参数预检；未调用图像 API。"
+    "completed_at":  "2026-09-26T12:38:11.3193115Z",
+    "note":  "必须完成技能规定的视觉审核后再复制 canonical base / 手动更新 imagegen-jobs.json；脚本不会自动标记 complete。"
 }

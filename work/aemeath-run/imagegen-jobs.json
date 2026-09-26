@@ -1,542 +1,601 @@
-{
-  "schema_version": 1,
-  "created_at": "2026-09-09T12:46:40.256775+00:00",
-  "run_dir": "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run",
-  "primary_generation_skill": "$imagegen",
-  "jobs": [
-    {
-      "id": "base",
-      "kind": "base-pet",
-      "status": "pending",
-      "prompt_file": "prompts/base-pet.md",
-      "input_images": [],
-      "output_path": "decoded/base.png",
-      "depends_on": [],
-      "generation_skill": "$imagegen",
-      "requires_grounded_generation": false,
-      "allow_prompt_only_generation": true
-    },
-    {
-      "id": "idle",
-      "kind": "row-strip",
-      "status": "pending",
-      "prompt_file": "prompts/rows/idle.md",
-      "retry_prompt_file": "prompts/row-retries/idle.md",
-      "input_images": [
-        {
-          "path": "references/layout-guides/idle.png",
-          "role": "layout guide for 6 frame slots; use for spacing only, do not copy guide lines"
-        },
-        {
-          "path": "references/canonical-base.png",
-          "role": "canonical identity reference"
-        }
-      ],
-      "output_path": "decoded/idle.png",
-      "depends_on": [
-        "base"
-      ],
-      "generation_skill": "$imagegen",
-      "requires_grounded_generation": true,
-      "allow_prompt_only_generation": false,
-      "identity_reference_paths": [
-        "references/canonical-base.png"
-      ],
-      "parallelizable_after": [
-        "base"
-      ],
-      "derivation_policy": {
-        "may_derive": false,
-        "reason": "no deterministic derivation is configured for this state"
-      },
-      "mirror_policy": {}
-    },
-    {
-      "id": "running-right",
-      "kind": "row-strip",
-      "status": "pending",
-      "prompt_file": "prompts/rows/running-right.md",
-      "retry_prompt_file": "prompts/row-retries/running-right.md",
-      "input_images": [
-        {
-          "path": "references/layout-guides/running-right.png",
-          "role": "layout guide for 8 frame slots; use for spacing only, do not copy guide lines"
-        },
-        {
-          "path": "references/canonical-base.png",
-          "role": "canonical identity reference"
-        }
-      ],
-      "output_path": "decoded/running-right.png",
-      "depends_on": [
-        "base"
-      ],
-      "generation_skill": "$imagegen",
-      "requires_grounded_generation": true,
-      "allow_prompt_only_generation": false,
-      "identity_reference_paths": [
-        "references/canonical-base.png"
-      ],
-      "parallelizable_after": [
-        "base"
-      ],
-      "derivation_policy": {
-        "may_derive": false,
-        "reason": "no deterministic derivation is configured for this state"
-      },
-      "mirror_policy": {}
-    },
-    {
-      "id": "running-left",
-      "kind": "row-strip",
-      "status": "pending",
-      "prompt_file": "prompts/rows/running-left.md",
-      "retry_prompt_file": "prompts/row-retries/running-left.md",
-      "input_images": [
-        {
-          "path": "references/layout-guides/running-left.png",
-          "role": "layout guide for 8 frame slots; use for spacing only, do not copy guide lines"
-        },
-        {
-          "path": "references/canonical-base.png",
-          "role": "canonical identity reference"
-        },
-        {
-          "path": "decoded/running-right.png",
-          "role": "rightward gait reference for leftward row decision"
-        }
-      ],
-      "output_path": "decoded/running-left.png",
-      "depends_on": [
-        "base",
-        "running-right"
-      ],
-      "generation_skill": "$imagegen",
-      "requires_grounded_generation": true,
-      "allow_prompt_only_generation": false,
-      "identity_reference_paths": [
-        "references/canonical-base.png"
-      ],
-      "parallelizable_after": [
-        "base",
-        "running-right"
-      ],
-      "derivation_policy": {
-        "may_derive": true,
-        "may_derive_from": "running-right",
-        "derivation": "framewise-horizontal-mirror-preserving-order",
-        "requires_explicit_approval": true,
-        "fallback_generation_skill": "$imagegen"
-      },
-      "mirror_policy": {
-        "may_derive": true,
-        "may_derive_from": "running-right",
-        "derivation": "framewise-horizontal-mirror-preserving-order",
-        "requires_explicit_approval": true,
-        "fallback_generation_skill": "$imagegen"
-      }
-    },
-    {
-      "id": "waving",
-      "kind": "row-strip",
-      "status": "pending",
-      "prompt_file": "prompts/rows/waving.md",
-      "retry_prompt_file": "prompts/row-retries/waving.md",
-      "input_images": [
-        {
-          "path": "references/layout-guides/waving.png",
-          "role": "layout guide for 4 frame slots; use for spacing only, do not copy guide lines"
-        },
-        {
-          "path": "references/canonical-base.png",
-          "role": "canonical identity reference"
-        }
-      ],
-      "output_path": "decoded/waving.png",
-      "depends_on": [
-        "base"
-      ],
-      "generation_skill": "$imagegen",
-      "requires_grounded_generation": true,
-      "allow_prompt_only_generation": false,
-      "identity_reference_paths": [
-        "references/canonical-base.png"
-      ],
-      "parallelizable_after": [
-        "base"
-      ],
-      "derivation_policy": {
-        "may_derive": false,
-        "reason": "state requires its own generated animation semantics"
-      },
-      "mirror_policy": {}
-    },
-    {
-      "id": "jumping",
-      "kind": "row-strip",
-      "status": "pending",
-      "prompt_file": "prompts/rows/jumping.md",
-      "retry_prompt_file": "prompts/row-retries/jumping.md",
-      "input_images": [
-        {
-          "path": "references/layout-guides/jumping.png",
-          "role": "layout guide for 5 frame slots; use for spacing only, do not copy guide lines"
-        },
-        {
-          "path": "references/canonical-base.png",
-          "role": "canonical identity reference"
-        }
-      ],
-      "output_path": "decoded/jumping.png",
-      "depends_on": [
-        "base"
-      ],
-      "generation_skill": "$imagegen",
-      "requires_grounded_generation": true,
-      "allow_prompt_only_generation": false,
-      "identity_reference_paths": [
-        "references/canonical-base.png"
-      ],
-      "parallelizable_after": [
-        "base"
-      ],
-      "derivation_policy": {
-        "may_derive": false,
-        "reason": "state requires its own generated animation semantics"
-      },
-      "mirror_policy": {}
-    },
-    {
-      "id": "failed",
-      "kind": "row-strip",
-      "status": "pending",
-      "prompt_file": "prompts/rows/failed.md",
-      "retry_prompt_file": "prompts/row-retries/failed.md",
-      "input_images": [
-        {
-          "path": "references/layout-guides/failed.png",
-          "role": "layout guide for 8 frame slots; use for spacing only, do not copy guide lines"
-        },
-        {
-          "path": "references/canonical-base.png",
-          "role": "canonical identity reference"
-        }
-      ],
-      "output_path": "decoded/failed.png",
-      "depends_on": [
-        "base"
-      ],
-      "generation_skill": "$imagegen",
-      "requires_grounded_generation": true,
-      "allow_prompt_only_generation": false,
-      "identity_reference_paths": [
-        "references/canonical-base.png"
-      ],
-      "parallelizable_after": [
-        "base"
-      ],
-      "derivation_policy": {
-        "may_derive": false,
-        "reason": "state requires its own generated animation semantics"
-      },
-      "mirror_policy": {}
-    },
-    {
-      "id": "waiting",
-      "kind": "row-strip",
-      "status": "pending",
-      "prompt_file": "prompts/rows/waiting.md",
-      "retry_prompt_file": "prompts/row-retries/waiting.md",
-      "input_images": [
-        {
-          "path": "references/layout-guides/waiting.png",
-          "role": "layout guide for 6 frame slots; use for spacing only, do not copy guide lines"
-        },
-        {
-          "path": "references/canonical-base.png",
-          "role": "canonical identity reference"
-        }
-      ],
-      "output_path": "decoded/waiting.png",
-      "depends_on": [
-        "base"
-      ],
-      "generation_skill": "$imagegen",
-      "requires_grounded_generation": true,
-      "allow_prompt_only_generation": false,
-      "identity_reference_paths": [
-        "references/canonical-base.png"
-      ],
-      "parallelizable_after": [
-        "base"
-      ],
-      "derivation_policy": {
-        "may_derive": false,
-        "reason": "state requires its own generated animation semantics"
-      },
-      "mirror_policy": {}
-    },
-    {
-      "id": "running",
-      "kind": "row-strip",
-      "status": "pending",
-      "prompt_file": "prompts/rows/running.md",
-      "retry_prompt_file": "prompts/row-retries/running.md",
-      "input_images": [
-        {
-          "path": "references/layout-guides/running.png",
-          "role": "layout guide for 6 frame slots; use for spacing only, do not copy guide lines"
-        },
-        {
-          "path": "references/canonical-base.png",
-          "role": "canonical identity reference"
-        }
-      ],
-      "output_path": "decoded/running.png",
-      "depends_on": [
-        "base"
-      ],
-      "generation_skill": "$imagegen",
-      "requires_grounded_generation": true,
-      "allow_prompt_only_generation": false,
-      "identity_reference_paths": [
-        "references/canonical-base.png"
-      ],
-      "parallelizable_after": [
-        "base"
-      ],
-      "derivation_policy": {
-        "may_derive": false,
-        "reason": "state requires its own generated animation semantics"
-      },
-      "mirror_policy": {}
-    },
-    {
-      "id": "review",
-      "kind": "row-strip",
-      "status": "pending",
-      "prompt_file": "prompts/rows/review.md",
-      "retry_prompt_file": "prompts/row-retries/review.md",
-      "input_images": [
-        {
-          "path": "references/layout-guides/review.png",
-          "role": "layout guide for 6 frame slots; use for spacing only, do not copy guide lines"
-        },
-        {
-          "path": "references/canonical-base.png",
-          "role": "canonical identity reference"
-        }
-      ],
-      "output_path": "decoded/review.png",
-      "depends_on": [
-        "base"
-      ],
-      "generation_skill": "$imagegen",
-      "requires_grounded_generation": true,
-      "allow_prompt_only_generation": false,
-      "identity_reference_paths": [
-        "references/canonical-base.png"
-      ],
-      "parallelizable_after": [
-        "base"
-      ],
-      "derivation_policy": {
-        "may_derive": false,
-        "reason": "state requires its own generated animation semantics"
-      },
-      "mirror_policy": {}
-    },
-    {
-      "id": "look-cardinals",
-      "kind": "look-cardinal-strip",
-      "status": "pending",
-      "prompt_file": "prompts/look-cardinals.md",
-      "repair_prompt_files": {
-        "000": "prompts/look-anchor-repairs/000.md",
-        "090": "prompts/look-anchor-repairs/090.md",
-        "180": "prompts/look-anchor-repairs/180.md",
-        "270": "prompts/look-anchor-repairs/270.md"
-      },
-      "input_images": [
-        {
-          "path": "references/layout-guides/look-cardinals.png",
-          "role": "layout guide for four cardinal slots; use for spacing only, do not copy guide lines"
-        },
-        {
-          "path": "references/canonical-base.png",
-          "role": "canonical identity reference"
-        },
-        {
-          "path": "qa/contact-sheet.png",
-          "role": "approved standard-row identity, scale, and baseline reference"
-        }
-      ],
-      "output_path": "decoded/look-cardinals.png",
-      "extracted_output_paths": [
-        "decoded/look-anchors/000.png",
-        "decoded/look-anchors/090.png",
-        "decoded/look-anchors/180.png",
-        "decoded/look-anchors/270.png"
-      ],
-      "approved_strip_path": "decoded/look-anchors-approved.png",
-      "depends_on": [
-        "idle",
-        "running-right",
-        "running-left",
-        "waving",
-        "jumping",
-        "failed",
-        "waiting",
-        "running",
-        "review"
-      ],
-      "generation_skill": "$imagegen",
-      "requires_grounded_generation": true,
-      "allow_prompt_only_generation": false,
-      "identity_reference_paths": [
-        "references/canonical-base.png"
-      ],
-      "look_mechanics_file": "qa/look-mechanics.md",
-      "directions": [
-        "000",
-        "090",
-        "180",
-        "270"
-      ],
-      "packaging_eligible": false,
-      "parallelizable_after": [
-        "idle",
-        "running-right",
-        "running-left",
-        "waving",
-        "jumping",
-        "failed",
-        "waiting",
-        "running",
-        "review"
-      ],
-      "derivation_policy": {
-        "may_derive": false,
-        "reason": "cardinal directions require grounded pet-specific generation"
-      }
-    },
-    {
-      "id": "look-row-9",
-      "kind": "look-row-strip",
-      "status": "pending",
-      "prompt_file": "prompts/rows/look-row-9.md",
-      "retry_prompt_file": "prompts/row-retries/look-row-9.md",
-      "input_images": [
-        {
-          "path": "references/layout-guides/look-row-9.png",
-          "role": "layout guide for 8 direction slots; use for spacing only, do not copy guide lines"
-        },
-        {
-          "path": "references/canonical-base.png",
-          "role": "canonical identity reference"
-        },
-        {
-          "path": "qa/contact-sheet.png",
-          "role": "approved standard-row identity, scale, and baseline reference"
-        },
-        {
-          "path": "decoded/look-anchors-approved.png",
-          "role": "approved cardinal reference strip in order 000 up, 090 screen-right, 180 down, 270 screen-left; interpolate intermediate directions evenly"
-        }
-      ],
-      "output_path": "decoded/look-row-9.png",
-      "depends_on": [
-        "look-cardinals"
-      ],
-      "generation_skill": "$imagegen",
-      "requires_grounded_generation": true,
-      "allow_prompt_only_generation": false,
-      "identity_reference_paths": [
-        "references/canonical-base.png"
-      ],
-      "look_mechanics_file": "qa/look-mechanics.md",
-      "directions": [
-        "000",
-        "022.5",
-        "045",
-        "067.5",
-        "090",
-        "112.5",
-        "135",
-        "157.5"
-      ],
-      "parallelizable_after": [
-        "look-cardinals"
-      ],
-      "derivation_policy": {
-        "may_derive": false,
-        "reason": "look directions require grounded pet-specific generation"
-      },
-      "coherent_synthesis_required": true,
-      "individual_cell_packaging_allowed": false,
-      "packaging_eligible": true
-    },
-    {
-      "id": "look-row-10",
-      "kind": "look-row-strip",
-      "status": "pending",
-      "prompt_file": "prompts/rows/look-row-10.md",
-      "retry_prompt_file": "prompts/row-retries/look-row-10.md",
-      "input_images": [
-        {
-          "path": "references/layout-guides/look-row-10.png",
-          "role": "layout guide for 8 direction slots; use for spacing only, do not copy guide lines"
-        },
-        {
-          "path": "references/canonical-base.png",
-          "role": "canonical identity reference"
-        },
-        {
-          "path": "qa/contact-sheet.png",
-          "role": "approved standard-row identity, scale, and baseline reference"
-        },
-        {
-          "path": "decoded/look-anchors-approved.png",
-          "role": "approved cardinal reference strip in order 000 up, 090 screen-right, 180 down, 270 screen-left; interpolate intermediate directions evenly"
-        },
-        {
-          "path": "decoded/look-row-9.png",
-          "role": "completed first half of the clockwise look loop for row 10 continuity"
-        }
-      ],
-      "output_path": "decoded/look-row-10.png",
-      "depends_on": [
-        "look-cardinals",
-        "look-row-9"
-      ],
-      "generation_skill": "$imagegen",
-      "requires_grounded_generation": true,
-      "allow_prompt_only_generation": false,
-      "identity_reference_paths": [
-        "references/canonical-base.png"
-      ],
-      "look_mechanics_file": "qa/look-mechanics.md",
-      "directions": [
-        "180",
-        "202.5",
-        "225",
-        "247.5",
-        "270",
-        "292.5",
-        "315",
-        "337.5"
-      ],
-      "parallelizable_after": [
-        "look-cardinals",
-        "look-row-9"
-      ],
-      "derivation_policy": {
-        "may_derive": false,
-        "reason": "look directions require grounded pet-specific generation"
-      },
-      "coherent_synthesis_required": true,
-      "individual_cell_packaging_allowed": false,
-      "packaging_eligible": true
-    }
-  ]
+﻿{
+    "schema_version":  1,
+    "created_at":  "2026-09-09T12:46:40.256775+00:00",
+    "run_dir":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run",
+    "primary_generation_skill":  "$imagegen",
+    "jobs":  [
+                 {
+                     "id":  "base",
+                     "kind":  "base-pet",
+                     "status":  "complete",
+                     "prompt_file":  "prompts/base-pet.md",
+                     "input_images":  [
+
+                                      ],
+                     "output_path":  "decoded/base.png",
+                     "depends_on":  [
+
+                                    ],
+                     "generation_skill":  "$imagegen",
+                     "requires_grounded_generation":  false,
+                     "allow_prompt_only_generation":  true,
+                     "source_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\decoded\\base.png",
+                     "completed_at":  "2026-09-26T12:43:29.1787390Z",
+                     "review_note":  "用户目视确认锁定：2代Q版，粉发金瞳星形高光、贴发小水晶夹、约2.2头身、洋红背景干净无裁切，作为 canonical base 使用。"
+                 },
+                 {
+                     "id":  "idle",
+                     "kind":  "row-strip",
+                     "status":  "complete",
+                     "prompt_file":  "prompts/rows/idle.md",
+                     "retry_prompt_file":  "prompts/row-retries/idle.md",
+                     "input_images":  [
+                                          {
+                                              "path":  "references/layout-guides/idle.png",
+                                              "role":  "layout guide for 6 frame slots; use for spacing only, do not copy guide lines"
+                                          },
+                                          {
+                                              "path":  "references/canonical-base.png",
+                                              "role":  "canonical identity reference"
+                                          }
+                                      ],
+                     "output_path":  "decoded/idle.png",
+                     "depends_on":  [
+                                        "base"
+                                    ],
+                     "generation_skill":  "$imagegen",
+                     "requires_grounded_generation":  true,
+                     "allow_prompt_only_generation":  false,
+                     "identity_reference_paths":  [
+                                                      "references/canonical-base.png"
+                                                  ],
+                     "parallelizable_after":  [
+                                                  "base"
+                                              ],
+                     "derivation_policy":  {
+                                               "may_derive":  false,
+                                               "reason":  "no deterministic derivation is configured for this state"
+                                           },
+                     "mirror_policy":  {
+
+                                       },
+                     "source_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\decoded\\idle.png",
+                     "completed_at":  "2026-09-26T12:50:21.9821565Z",
+                     "review_note":  "用户目视确认：idle 六帧间距清晰、比例基线稳定、身份与 canonical base 一致，接受当前待机表情，标记完成。"
+                 },
+                 {
+                     "id":  "running-right",
+                     "kind":  "row-strip",
+                     "status":  "complete",
+                     "prompt_file":  "prompts/rows/running-right.md",
+                     "retry_prompt_file":  "prompts/row-retries/running-right.md",
+                     "input_images":  [
+                                          {
+                                              "path":  "references/layout-guides/running-right.png",
+                                              "role":  "layout guide for 8 frame slots; use for spacing only, do not copy guide lines"
+                                          },
+                                          {
+                                              "path":  "references/canonical-base.png",
+                                              "role":  "canonical identity reference"
+                                          }
+                                      ],
+                     "output_path":  "decoded/running-right.png",
+                     "depends_on":  [
+                                        "base"
+                                    ],
+                     "generation_skill":  "$imagegen",
+                     "requires_grounded_generation":  true,
+                     "allow_prompt_only_generation":  false,
+                     "identity_reference_paths":  [
+                                                      "references/canonical-base.png"
+                                                  ],
+                     "parallelizable_after":  [
+                                                  "base"
+                                              ],
+                     "derivation_policy":  {
+                                               "may_derive":  false,
+                                               "reason":  "no deterministic derivation is configured for this state"
+                                           },
+                     "mirror_policy":  {
+
+                                       },
+                     "source_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\decoded\\running-right.png",
+                     "completed_at":  "2026-09-26T12:59:18.1207896Z",
+                     "review_note":  "用户目视确认：8帧跑动姿态清晰、间距充分、触边为0、身份与canonical base一致。"
+                 },
+                 {
+                     "id":  "running-left",
+                     "kind":  "row-strip",
+                     "status":  "complete",
+                     "prompt_file":  "prompts/rows/running-left.md",
+                     "retry_prompt_file":  "prompts/row-retries/running-left.md",
+                     "input_images":  [
+                                          {
+                                              "path":  "references/layout-guides/running-left.png",
+                                              "role":  "layout guide for 8 frame slots; use for spacing only, do not copy guide lines"
+                                          },
+                                          {
+                                              "path":  "references/canonical-base.png",
+                                              "role":  "canonical identity reference"
+                                          },
+                                          {
+                                              "path":  "decoded/running-right.png",
+                                              "role":  "rightward gait reference for leftward row decision"
+                                          }
+                                      ],
+                     "output_path":  "decoded/running-left.png",
+                     "depends_on":  [
+                                        "base",
+                                        "running-right"
+                                    ],
+                     "generation_skill":  "$imagegen",
+                     "requires_grounded_generation":  true,
+                     "allow_prompt_only_generation":  false,
+                     "identity_reference_paths":  [
+                                                      "references/canonical-base.png"
+                                                  ],
+                     "parallelizable_after":  [
+                                                  "base",
+                                                  "running-right"
+                                              ],
+                     "derivation_policy":  {
+                                               "may_derive":  true,
+                                               "may_derive_from":  "running-right",
+                                               "derivation":  "framewise-horizontal-mirror-preserving-order",
+                                               "requires_explicit_approval":  true,
+                                               "fallback_generation_skill":  "$imagegen"
+                                           },
+                     "mirror_policy":  {
+                                           "may_derive":  true,
+                                           "may_derive_from":  "running-right",
+                                           "derivation":  "framewise-horizontal-mirror-preserving-order",
+                                           "requires_explicit_approval":  true,
+                                           "fallback_generation_skill":  "$imagegen"
+                                       },
+                     "source_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\decoded\\running-left.png",
+                     "completed_at":  "2026-09-26T13:02:56.5067927Z",
+                     "review_note":  "用户目视确认：8帧朝左跑动，与running-right为正确镜像关系，无道具、触边为0。"
+                 },
+                 {
+                     "id":  "waving",
+                     "kind":  "row-strip",
+                     "status":  "complete",
+                     "prompt_file":  "prompts/rows/waving.md",
+                     "retry_prompt_file":  "prompts/row-retries/waving.md",
+                     "input_images":  [
+                                          {
+                                              "path":  "references/layout-guides/waving.png",
+                                              "role":  "layout guide for 4 frame slots; use for spacing only, do not copy guide lines"
+                                          },
+                                          {
+                                              "path":  "references/canonical-base.png",
+                                              "role":  "canonical identity reference"
+                                          }
+                                      ],
+                     "output_path":  "decoded/waving.png",
+                     "depends_on":  [
+                                        "base"
+                                    ],
+                     "generation_skill":  "$imagegen",
+                     "requires_grounded_generation":  true,
+                     "allow_prompt_only_generation":  false,
+                     "identity_reference_paths":  [
+                                                      "references/canonical-base.png"
+                                                  ],
+                     "parallelizable_after":  [
+                                                  "base"
+                                              ],
+                     "derivation_policy":  {
+                                               "may_derive":  false,
+                                               "reason":  "state requires its own generated animation semantics"
+                                           },
+                     "mirror_policy":  {
+
+                                       },
+                     "source_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\decoded\\waving.png",
+                     "completed_at":  "2026-09-26T12:59:18.1474505Z",
+                     "review_note":  "用户目视确认：4帧挥手姿势明确、基线稳定、无多余道具，接受。"
+                 },
+                 {
+                     "id":  "jumping",
+                     "kind":  "row-strip",
+                     "status":  "complete",
+                     "prompt_file":  "prompts/rows/jumping.md",
+                     "retry_prompt_file":  "prompts/row-retries/jumping.md",
+                     "input_images":  [
+                                          {
+                                              "path":  "references/layout-guides/jumping.png",
+                                              "role":  "layout guide for 5 frame slots; use for spacing only, do not copy guide lines"
+                                          },
+                                          {
+                                              "path":  "references/canonical-base.png",
+                                              "role":  "canonical identity reference"
+                                          }
+                                      ],
+                     "output_path":  "decoded/jumping.png",
+                     "depends_on":  [
+                                        "base"
+                                    ],
+                     "generation_skill":  "$imagegen",
+                     "requires_grounded_generation":  true,
+                     "allow_prompt_only_generation":  false,
+                     "identity_reference_paths":  [
+                                                      "references/canonical-base.png"
+                                                  ],
+                     "parallelizable_after":  [
+                                                  "base"
+                                              ],
+                     "derivation_policy":  {
+                                               "may_derive":  false,
+                                               "reason":  "state requires its own generated animation semantics"
+                                           },
+                     "mirror_policy":  {
+
+                                       },
+                     "source_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\decoded\\jumping.png",
+                     "completed_at":  "2026-09-26T12:59:18.2004378Z",
+                     "review_note":  "用户目视确认：5帧腾空跳跃姿态连贯、落地稳定，垂直位移符合跳跃状态。"
+                 },
+                 {
+                     "id":  "failed",
+                     "kind":  "row-strip",
+                     "status":  "complete",
+                     "prompt_file":  "prompts/rows/failed.md",
+                     "retry_prompt_file":  "prompts/row-retries/failed.md",
+                     "input_images":  [
+                                          {
+                                              "path":  "references/layout-guides/failed.png",
+                                              "role":  "layout guide for 8 frame slots; use for spacing only, do not copy guide lines"
+                                          },
+                                          {
+                                              "path":  "references/canonical-base.png",
+                                              "role":  "canonical identity reference"
+                                          }
+                                      ],
+                     "output_path":  "decoded/failed.png",
+                     "depends_on":  [
+                                        "base"
+                                    ],
+                     "generation_skill":  "$imagegen",
+                     "requires_grounded_generation":  true,
+                     "allow_prompt_only_generation":  false,
+                     "identity_reference_paths":  [
+                                                      "references/canonical-base.png"
+                                                  ],
+                     "parallelizable_after":  [
+                                                  "base"
+                                              ],
+                     "derivation_policy":  {
+                                               "may_derive":  false,
+                                               "reason":  "state requires its own generated animation semantics"
+                                           },
+                     "mirror_policy":  {
+
+                                       },
+                     "source_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\decoded\\failed.png",
+                     "completed_at":  "2026-09-26T12:59:18.0933073Z",
+                     "review_note":  "用户目视确认：8帧沮丧下沉表现明确、无道具、帧间过渡连续。"
+                 },
+                 {
+                     "id":  "waiting",
+                     "kind":  "row-strip",
+                     "status":  "complete",
+                     "prompt_file":  "prompts/rows/waiting.md",
+                     "retry_prompt_file":  "prompts/row-retries/waiting.md",
+                     "input_images":  [
+                                          {
+                                              "path":  "references/layout-guides/waiting.png",
+                                              "role":  "layout guide for 6 frame slots; use for spacing only, do not copy guide lines"
+                                          },
+                                          {
+                                              "path":  "references/canonical-base.png",
+                                              "role":  "canonical identity reference"
+                                          }
+                                      ],
+                     "output_path":  "decoded/waiting.png",
+                     "depends_on":  [
+                                        "base"
+                                    ],
+                     "generation_skill":  "$imagegen",
+                     "requires_grounded_generation":  true,
+                     "allow_prompt_only_generation":  false,
+                     "identity_reference_paths":  [
+                                                      "references/canonical-base.png"
+                                                  ],
+                     "parallelizable_after":  [
+                                                  "base"
+                                              ],
+                     "derivation_policy":  {
+                                               "may_derive":  false,
+                                               "reason":  "state requires its own generated animation semantics"
+                                           },
+                     "mirror_policy":  {
+
+                                       },
+                     "source_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\decoded\\waiting.png",
+                     "completed_at":  "2026-09-26T12:59:18.0418340Z",
+                     "review_note":  "用户目视确认：6帧等待姿态安静、基线稳定、身份一致。"
+                 },
+                 {
+                     "id":  "running",
+                     "kind":  "row-strip",
+                     "status":  "complete",
+                     "prompt_file":  "prompts/rows/running.md",
+                     "retry_prompt_file":  "prompts/row-retries/running.md",
+                     "input_images":  [
+                                          {
+                                              "path":  "references/layout-guides/running.png",
+                                              "role":  "layout guide for 6 frame slots; use for spacing only, do not copy guide lines"
+                                          },
+                                          {
+                                              "path":  "references/canonical-base.png",
+                                              "role":  "canonical identity reference"
+                                          }
+                                      ],
+                     "output_path":  "decoded/running.png",
+                     "depends_on":  [
+                                        "base"
+                                    ],
+                     "generation_skill":  "$imagegen",
+                     "requires_grounded_generation":  true,
+                     "allow_prompt_only_generation":  false,
+                     "identity_reference_paths":  [
+                                                      "references/canonical-base.png"
+                                                  ],
+                     "parallelizable_after":  [
+                                                  "base"
+                                              ],
+                     "derivation_policy":  {
+                                               "may_derive":  false,
+                                               "reason":  "state requires its own generated animation semantics"
+                                           },
+                     "mirror_policy":  {
+
+                                       },
+                     "source_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\decoded\\running.png",
+                     "completed_at":  "2026-09-26T13:02:56.4506970Z",
+                     "review_note":  "用户目视确认重出版：双手完全空置无任何道具，6帧基线比例一致，仅保留专注小动作与眨眼。"
+                 },
+                 {
+                     "id":  "review",
+                     "kind":  "row-strip",
+                     "status":  "complete",
+                     "prompt_file":  "prompts/rows/review.md",
+                     "retry_prompt_file":  "prompts/row-retries/review.md",
+                     "input_images":  [
+                                          {
+                                              "path":  "references/layout-guides/review.png",
+                                              "role":  "layout guide for 6 frame slots; use for spacing only, do not copy guide lines"
+                                          },
+                                          {
+                                              "path":  "references/canonical-base.png",
+                                              "role":  "canonical identity reference"
+                                          }
+                                      ],
+                     "output_path":  "decoded/review.png",
+                     "depends_on":  [
+                                        "base"
+                                    ],
+                     "generation_skill":  "$imagegen",
+                     "requires_grounded_generation":  true,
+                     "allow_prompt_only_generation":  false,
+                     "identity_reference_paths":  [
+                                                      "references/canonical-base.png"
+                                                  ],
+                     "parallelizable_after":  [
+                                                  "base"
+                                              ],
+                     "derivation_policy":  {
+                                               "may_derive":  false,
+                                               "reason":  "state requires its own generated animation semantics"
+                                           },
+                     "mirror_policy":  {
+
+                                       },
+                     "source_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\decoded\\review.png",
+                     "completed_at":  "2026-09-26T12:59:18.1735361Z",
+                     "review_note":  "用户目视确认：6帧检视姿态清晰、无道具、循环首尾接近。"
+                 },
+                 {
+                     "id":  "look-cardinals",
+                     "kind":  "look-cardinal-strip",
+                     "status":  "complete",
+                     "prompt_file":  "prompts/look-cardinals.md",
+                     "repair_prompt_files":  {
+                                                 "000":  "prompts/look-anchor-repairs/000.md",
+                                                 "090":  "prompts/look-anchor-repairs/090.md",
+                                                 "180":  "prompts/look-anchor-repairs/180.md",
+                                                 "270":  "prompts/look-anchor-repairs/270.md"
+                                             },
+                     "input_images":  [
+                                          {
+                                              "path":  "references/layout-guides/look-cardinals.png",
+                                              "role":  "layout guide for four cardinal slots; use for spacing only, do not copy guide lines"
+                                          },
+                                          {
+                                              "path":  "references/canonical-base.png",
+                                              "role":  "canonical identity reference"
+                                          },
+                                          {
+                                              "path":  "qa/contact-sheet.png",
+                                              "role":  "approved standard-row identity, scale, and baseline reference"
+                                          }
+                                      ],
+                     "output_path":  "decoded/look-cardinals.png",
+                     "extracted_output_paths":  [
+                                                    "decoded/look-anchors/000.png",
+                                                    "decoded/look-anchors/090.png",
+                                                    "decoded/look-anchors/180.png",
+                                                    "decoded/look-anchors/270.png"
+                                                ],
+                     "approved_strip_path":  "decoded/look-anchors-approved.png",
+                     "depends_on":  [
+                                        "idle",
+                                        "running-right",
+                                        "running-left",
+                                        "waving",
+                                        "jumping",
+                                        "failed",
+                                        "waiting",
+                                        "running",
+                                        "review"
+                                    ],
+                     "generation_skill":  "$imagegen",
+                     "requires_grounded_generation":  true,
+                     "allow_prompt_only_generation":  false,
+                     "identity_reference_paths":  [
+                                                      "references/canonical-base.png"
+                                                  ],
+                     "look_mechanics_file":  "qa/look-mechanics.md",
+                     "directions":  [
+                                        "000",
+                                        "090",
+                                        "180",
+                                        "270"
+                                    ],
+                     "packaging_eligible":  false,
+                     "parallelizable_after":  [
+                                                  "idle",
+                                                  "running-right",
+                                                  "running-left",
+                                                  "waving",
+                                                  "jumping",
+                                                  "failed",
+                                                  "waiting",
+                                                  "running",
+                                                  "review"
+                                              ],
+                     "derivation_policy":  {
+                                               "may_derive":  false,
+                                               "reason":  "cardinal directions require grounded pet-specific generation"
+                                           },
+                     "source_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\decoded\\look-cardinals.png",
+                     "completed_at":  "2026-09-26T13:11:54.8347454Z",
+                     "review_note":  "依据逐格地标核验：000虹膜外露上转+下巴微抬、090两眼虹膜右偏+鼻尖朝观者右、180上眼睑下压+头部前俯、270两眼虹膜左偏+鼻尖朝观者左；四向均正确，实测偏移已记入方向语义表。"
+                 },
+                 {
+                     "id":  "look-row-9",
+                     "kind":  "look-row-strip",
+                     "status":  "complete",
+                     "prompt_file":  "prompts/rows/look-row-9.md",
+                     "retry_prompt_file":  "prompts/row-retries/look-row-9.md",
+                     "input_images":  [
+                                          {
+                                              "path":  "references/layout-guides/look-row-9.png",
+                                              "role":  "layout guide for 8 direction slots; use for spacing only, do not copy guide lines"
+                                          },
+                                          {
+                                              "path":  "references/canonical-base.png",
+                                              "role":  "canonical identity reference"
+                                          },
+                                          {
+                                              "path":  "qa/contact-sheet.png",
+                                              "role":  "approved standard-row identity, scale, and baseline reference"
+                                          },
+                                          {
+                                              "path":  "decoded/look-anchors-approved.png",
+                                              "role":  "approved cardinal reference strip in order 000 up, 090 screen-right, 180 down, 270 screen-left; interpolate intermediate directions evenly"
+                                          }
+                                      ],
+                     "output_path":  "decoded/look-row-9.png",
+                     "depends_on":  [
+                                        "look-cardinals"
+                                    ],
+                     "generation_skill":  "$imagegen",
+                     "requires_grounded_generation":  true,
+                     "allow_prompt_only_generation":  false,
+                     "identity_reference_paths":  [
+                                                      "references/canonical-base.png"
+                                                  ],
+                     "look_mechanics_file":  "qa/look-mechanics.md",
+                     "directions":  [
+                                        "000",
+                                        "022.5",
+                                        "045",
+                                        "067.5",
+                                        "090",
+                                        "112.5",
+                                        "135",
+                                        "157.5"
+                                    ],
+                     "parallelizable_after":  [
+                                                  "look-cardinals"
+                                              ],
+                     "derivation_policy":  {
+                                               "may_derive":  false,
+                                               "reason":  "look directions require grounded pet-specific generation"
+                                           },
+                     "coherent_synthesis_required":  true,
+                     "individual_cell_packaging_allowed":  false,
+                     "packaging_eligible":  true,
+                     "source_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\decoded\\look-row-9.png",
+                     "completed_at":  "2026-09-26T13:23:47.1506562Z",
+                     "review_note":  "逐格地标核验：八格全部正面、双眼可见、无整体旋转；000上视与090右视两个硬门卡明确通过，045/090/112.5/135/157.5方向正确；022.5与067.5垂直分量偏弱记警告。"
+                 },
+                 {
+                     "id":  "look-row-10",
+                     "kind":  "look-row-strip",
+                     "status":  "complete",
+                     "prompt_file":  "prompts/rows/look-row-10.md",
+                     "retry_prompt_file":  "prompts/row-retries/look-row-10.md",
+                     "input_images":  [
+                                          {
+                                              "path":  "references/layout-guides/look-row-10.png",
+                                              "role":  "layout guide for 8 direction slots; use for spacing only, do not copy guide lines"
+                                          },
+                                          {
+                                              "path":  "references/canonical-base.png",
+                                              "role":  "canonical identity reference"
+                                          },
+                                          {
+                                              "path":  "qa/contact-sheet.png",
+                                              "role":  "approved standard-row identity, scale, and baseline reference"
+                                          },
+                                          {
+                                              "path":  "decoded/look-anchors-approved.png",
+                                              "role":  "approved cardinal reference strip in order 000 up, 090 screen-right, 180 down, 270 screen-left; interpolate intermediate directions evenly"
+                                          },
+                                          {
+                                              "path":  "decoded/look-row-9.png",
+                                              "role":  "completed first half of the clockwise look loop for row 10 continuity"
+                                          }
+                                      ],
+                     "output_path":  "decoded/look-row-10.png",
+                     "depends_on":  [
+                                        "look-cardinals",
+                                        "look-row-9"
+                                    ],
+                     "generation_skill":  "$imagegen",
+                     "requires_grounded_generation":  true,
+                     "allow_prompt_only_generation":  false,
+                     "identity_reference_paths":  [
+                                                      "references/canonical-base.png"
+                                                  ],
+                     "look_mechanics_file":  "qa/look-mechanics.md",
+                     "directions":  [
+                                        "180",
+                                        "202.5",
+                                        "225",
+                                        "247.5",
+                                        "270",
+                                        "292.5",
+                                        "315",
+                                        "337.5"
+                                    ],
+                     "parallelizable_after":  [
+                                                  "look-cardinals",
+                                                  "look-row-9"
+                                              ],
+                     "derivation_policy":  {
+                                               "may_derive":  false,
+                                               "reason":  "look directions require grounded pet-specific generation"
+                                           },
+                     "coherent_synthesis_required":  true,
+                     "individual_cell_packaging_allowed":  false,
+                     "packaging_eligible":  true,
+                     "source_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\decoded\\look-row-10.png",
+                     "completed_at":  "2026-09-26T13:31:24.4743356Z",
+                     "review_note":  "逐格核验：八格保持正面双眼可见、无整体旋转；垂直序列单调上行且与行9衔接；180下视与270左视两个硬门卡方向正确；202.5/225/292.5/315水平分量偏弱且实测在反侧，已如实记为警告。"
+                 }
+             ]
 }

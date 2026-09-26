@@ -1,0 +1,50 @@
+﻿{
+    "status":  "pending_visual_review",
+    "directions":  [
+                       {
+                           "degree":  "000",
+                           "expected":  "up",
+                           "observed":  "",
+                           "horizontal_axis_expected":  "not_required",
+                           "horizontal_axis_evidence":  "",
+                           "vertical_axis_expected":  "up",
+                           "vertical_axis_evidence":  "",
+                           "verdict":  "pending",
+                           "reason":  ""
+                       },
+                       {
+                           "degree":  "090",
+                           "expected":  "screen-right",
+                           "observed":  "",
+                           "horizontal_axis_expected":  "screen-right",
+                           "horizontal_axis_evidence":  "",
+                           "vertical_axis_expected":  "not_required",
+                           "vertical_axis_evidence":  "",
+                           "verdict":  "pending",
+                           "reason":  ""
+                       },
+                       {
+                           "degree":  "180",
+                           "expected":  "down",
+                           "observed":  "",
+                           "horizontal_axis_expected":  "not_required",
+                           "horizontal_axis_evidence":  "",
+                           "vertical_axis_expected":  "down",
+                           "vertical_axis_evidence":  "",
+                           "verdict":  "pending",
+                           "reason":  ""
+                       },
+                       {
+                           "degree":  "270",
+                           "expected":  "screen-left",
+                           "observed":  "",
+                           "horizontal_axis_expected":  "screen-left",
+                           "horizontal_axis_evidence":  "",
+                           "vertical_axis_expected":  "not_required",
+                           "vertical_axis_evidence":  "",
+                           "verdict":  "pending",
+                           "reason":  ""
+                       }
+                   ],
+    "note":  "This is a blank template, not an approval. A reviewer must inspect each normal-size pose and the ordered loop."
+}

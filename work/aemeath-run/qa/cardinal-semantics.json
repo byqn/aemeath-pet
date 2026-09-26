@@ -1,0 +1,50 @@
+{
+  "status": "reviewed_pass",
+  "directions": [
+    {
+      "degree": "000",
+      "expected": "up",
+      "observed": "脸大体保持正面；虹膜完整外露且位于眼白上部，上眼睑抬高、眼裂明显张开，下巴微抬、头部略后仰。",
+      "horizontal_axis_expected": "not_required",
+      "horizontal_axis_evidence": "",
+      "vertical_axis_expected": "up",
+      "vertical_axis_evidence": "虹膜重心 y=116（格内高 208），相对头部重心 dy=+51.1；对照 180 的 dy=+56.7，虹膜位置更高约 4px，且上眼睑完全离开虹膜上缘。",
+      "verdict": "pass",
+      "reason": "垂直方向由眼球上转加轻微后仰表达；与 180 并排比较时眼裂更大、虹膜上缘无遮挡，地标可判定为朝上。"
+    },
+    {
+      "degree": "090",
+      "expected": "screen-right",
+      "observed": "左右两眼的虹膜均偏向各自眼白的右侧，鼻尖与面部朝观者右侧；左侧脸颊与左侧发束露出更多，右侧水晶发夹被头发部分遮挡。",
+      "horizontal_axis_expected": "screen-right",
+      "horizontal_axis_evidence": "虹膜重心相对头部重心 dx=+5.7px（以观者右为正）；两眼的虹膜相对各自眼白中心同样一致右偏。",
+      "vertical_axis_expected": "not_required",
+      "vertical_axis_evidence": "",
+      "verdict": "pass",
+      "reason": "瞳孔、鼻尖两个地标都落在头部中心的观者右侧，符合 090 屏幕右的判定规则；屏幕右按观者坐标解读。"
+    },
+    {
+      "degree": "180",
+      "expected": "down",
+      "observed": "上眼睑下压盖住虹膜上部，虹膜整体偏低，头部前俯、下巴内收，视线低垂。",
+      "horizontal_axis_expected": "not_required",
+      "horizontal_axis_evidence": "",
+      "vertical_axis_expected": "down",
+      "vertical_axis_evidence": "虹膜重心相对头部重心 dy=+56.7，比 000 的 +51.1 低约 4px；上眼睑明显覆盖虹膜上部，与 000 的完全外露形成可辨差异。",
+      "verdict": "pass",
+      "reason": "垂直方向由眼睑下压加头部前俯表达；与 000 并排比较可读出视线由抬高转为低垂，判定为朝下。"
+    },
+    {
+      "degree": "270",
+      "expected": "screen-left",
+      "observed": "左右两眼的虹膜均偏向各自眼白的左侧，鼻尖与面部朝观者左侧；右侧脸颊与右侧发束露出更多，左侧水晶发夹被头发部分遮挡。",
+      "horizontal_axis_expected": "screen-left",
+      "horizontal_axis_evidence": "虹膜重心相对头部重心 dx=-8.1px（以观者右为正，负值即观者左）；两眼的虹膜相对各自眼白中心一致左偏。",
+      "vertical_axis_expected": "not_required",
+      "vertical_axis_evidence": "",
+      "verdict": "pass",
+      "reason": "瞳孔、鼻尖两个地标都落在头部中心的观者左侧，符合 270 屏幕左的判定规则；与 090 为正确镜像关系。"
+    }
+  ],
+  "note": "由工具测量加逐格目视核对后填写。四个正向的地标方向均正确；090/270 的瞳孔偏移量偏含蓄（约 6-8px / 192px 格宽），已在此如实记录，最终以行 9、行 10 的连续性与语义复检为准。"
+}

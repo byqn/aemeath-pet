@@ -1,0 +1,94 @@
+{
+  "status": "reviewed_with_warnings",
+  "directions": [
+    {
+      "degree": "000",
+      "expected": "up",
+      "observed": "脸正面、身体未旋转；虹膜完整外露且位于眼白上部，上眼睑抬高，眼裂最大。",
+      "horizontal_axis_expected": "not_required",
+      "horizontal_axis_evidence": "",
+      "vertical_axis_expected": "up",
+      "vertical_axis_evidence": "虹膜重心相对头部 dy=53.8，为八格中最小值（最高）；眼裂开度也是八格最大。",
+      "verdict": "pass",
+      "reason": "眼球上转加眼睑抬高，与 157.5 并排比较时视线明显朝上，作为本行起点成立。"
+    },
+    {
+      "degree": "022.5",
+      "expected": "up-right",
+      "observed": "身体正面、双眼可见；瞳孔位于眼白中部，未见明显右偏，垂直方向仅轻微上抬。",
+      "horizontal_axis_expected": "screen-right",
+      "horizontal_axis_evidence": "虹膜重心相对头部 dx=-5.5，实测偏观者左侧，与期望的 screen-right 方向相反。",
+      "vertical_axis_expected": "up",
+      "vertical_axis_evidence": "虹膜重心 dy=56.2，比 000 的 53.8 更低，上抬幅度不足。",
+      "verdict": "warning",
+      "reason": "如实记录：该格的水平方向实测为轻微左偏而非右上，破坏了 000→045 之间的单调步进。偏差量小（约 13px 相对于相邻格），且不属于硬门卡方向，放行但记为警告，由最终连续性与盲测复检。"
+    },
+    {
+      "degree": "045",
+      "expected": "up-right",
+      "observed": "瞳孔明显偏向眼白右侧，眼裂仍较开，面部保持正面。",
+      "horizontal_axis_expected": "screen-right",
+      "horizontal_axis_evidence": "虹膜重心相对头部 dx=+7.4，明确落在观者右侧。",
+      "vertical_axis_expected": "up",
+      "vertical_axis_evidence": "虹膜重心 dy=53.9，与 000 的 53.8 基本持平，保持在上抬姿态。",
+      "verdict": "pass",
+      "reason": "水平右偏清晰，垂直保持上抬，符合 045 的右上家族。"
+    },
+    {
+      "degree": "067.5",
+      "expected": "up-right",
+      "observed": "瞳孔稳定偏向眼白右侧，面部正面；垂直方向上眼睑略有下压，上抬感减弱。",
+      "horizontal_axis_expected": "screen-right",
+      "horizontal_axis_evidence": "虹膜重心相对头部 dx=+8.9，为八格中右偏最大者。",
+      "vertical_axis_expected": "up",
+      "vertical_axis_evidence": "虹膜重心 dy=60.2，比 000/045 的约 53.8 更低，实测上抬不足。",
+      "verdict": "warning",
+      "reason": "水平方向右偏最强、方向正确；但垂直分量实测偏中甚至偏低，'右上'读起来更接近'正右'。偏差属中间格，记为警告并交由最终盲测复检。"
+    },
+    {
+      "degree": "090",
+      "expected": "screen-right",
+      "observed": "两眼虹膜均位于眼白右侧、越过中线，鼻尖与面部朝观者右侧，眼睑略收窄。",
+      "horizontal_axis_expected": "screen-right",
+      "horizontal_axis_evidence": "虹膜重心相对头部 dx=+8.7，明显位于观者右侧。",
+      "vertical_axis_expected": "not_required",
+      "vertical_axis_evidence": "",
+      "verdict": "pass",
+      "reason": "硬门卡方向。瞳孔与鼻尖两个地标一致指向观者右，与已批准的 090 锚点方向一致。"
+    },
+    {
+      "degree": "112.5",
+      "expected": "down-right",
+      "observed": "瞳孔位于眼白右下区域，上眼睑开始下压，视线朝右下。",
+      "horizontal_axis_expected": "screen-right",
+      "horizontal_axis_evidence": "虹膜重心相对头部 dx=+7.4，仍在观者右侧。",
+      "vertical_axis_expected": "down",
+      "vertical_axis_evidence": "虹膜重心 dy=58.7，比 045 的 53.9 下移约 5px，眼睑开度减小。",
+      "verdict": "pass",
+      "reason": "水平保持右偏、垂直开始下移，符合 090→135 之间的插值位置。"
+    },
+    {
+      "degree": "135",
+      "expected": "down-right",
+      "observed": "虹膜位于眼白右下，上眼睑明显下压，视线朝右下。",
+      "horizontal_axis_expected": "screen-right",
+      "horizontal_axis_evidence": "虹膜重心相对头部 dx=+7.1，维持在观者右侧。",
+      "vertical_axis_expected": "down",
+      "vertical_axis_evidence": "虹膜重心 dy=61.8，为八格中第二低，眼睑覆盖虹膜上部。",
+      "verdict": "pass",
+      "reason": "右偏与下视同时成立，且比 112.5 更向下，步进方向正确。"
+    },
+    {
+      "degree": "157.5",
+      "expected": "down-right",
+      "observed": "上眼睑大幅下压、虹膜接近眼白下部，右偏基本收回至中线附近，视线几乎朝下。",
+      "horizontal_axis_expected": "screen-right",
+      "horizontal_axis_evidence": "虹膜重心相对头部 dx=+1.7，仍略偏观者右侧，未越到左侧。",
+      "vertical_axis_expected": "down",
+      "vertical_axis_evidence": "虹膜重心 dy=64.1，为八格中最大（最低），眼睑开度为八格最小。",
+      "verdict": "pass",
+      "reason": "作为本行末端，下视最强且未翻向左侧，可与行 10 的 180 连续衔接。"
+    }
+  ],
+  "note": "由瞳孔/鼻尖地标测量加逐格放大目视核对填写。八格全部保持正面且双眼可见，未出现整体旋转或背面。000、090 两个硬门卡方向判定为 pass；022.5 与 067.5 因垂直分量偏弱、022.5 还有水平轻微反向，如实记为 warning，等待最终盲测与连续性复检。"
+}

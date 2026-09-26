@@ -1,0 +1,23 @@
+﻿{
+    "job_id":  "look-row-9",
+    "mode":  "edit",
+    "dry_run":  false,
+    "retried_bad_request":  false,
+    "output_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\decoded\\look-row-9.png",
+    "prompt_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\prompts\\rows\\look-row-9.md",
+    "effective_prompt_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\qa\\cli-runs\\look-row-9-prompt.md",
+    "input_images":  [
+                         "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\references\\layout-guides\\look-row-9.png",
+                         "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\references\\canonical-base.png",
+                         "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\qa\\contact-sheet.png",
+                         "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\decoded\\look-anchors-approved.png"
+                     ],
+    "qa_outputs":  [
+                       "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\qa\\look-row-9-registered.png",
+                       "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\qa\\look-row-9-registration.json",
+                       "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\qa\\look-row-9-semantics-template.json"
+                   ],
+    "cli_exit_code":  0,
+    "completed_at":  "2026-09-26T13:21:12.2656547Z",
+    "note":  "必须完成技能规定的视觉审核后再复制 canonical base / 手动更新 imagegen-jobs.json；脚本不会自动标记 complete。"
+}
