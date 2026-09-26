@@ -136,12 +136,19 @@ try {
     }
     $script:aiConfig = $null
     $script:aiReady = $false
-    try {
-        $script:aiConfig = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
-        $script:aiReady = (-not $NoAi) -and $script:aiConfig.enabled -and
-                          (-not [string]::IsNullOrWhiteSpace($script:aiConfig.api_key))
+    function Reload-AiConfig() {
+        try {
+            $script:aiConfig = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            $script:aiReady = (-not $NoAi) -and $script:aiConfig.enabled -and
+                              (-not [string]::IsNullOrWhiteSpace($script:aiConfig.api_key))
+        }
+        catch {
+            $script:aiConfig = $null
+            $script:aiReady = $false
+            Write-Log "ai-config.json 解析失败：$($_.Exception.Message)"
+        }
     }
-    catch { Write-Log "ai-config.json 解析失败：$($_.Exception.Message)" }
+    Reload-AiConfig
 
     try {
         [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
@@ -621,6 +628,14 @@ try {
         }
     } | Out-Null
     Add-MenuItem 'AI 状态' { Show-Bubble (Get-AiStatusText) 6000 } | Out-Null
+    Add-MenuItem '打开 AI 配置（记事本）' {
+        try { Start-Process -FilePath 'notepad.exe' -ArgumentList $configPath } catch { }
+        Show-Bubble '改完记得点「重新载入 AI 配置」' 6000
+    } | Out-Null
+    Add-MenuItem '重新载入 AI 配置' {
+        Reload-AiConfig
+        Show-Bubble (Get-AiStatusText) 6000
+    } | Out-Null
     $menu.Items.Add((New-Object System.Windows.Controls.Separator)) | Out-Null
     Add-MenuItem '看向鼠标' { $script:followMouse = -not $script:followMouse } | Out-Null
     Add-MenuItem '回到右下角' { $window.Left = $script:work.Right - $window.Width - 60; $window.Top = $script:floorTop } | Out-Null
