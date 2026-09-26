@@ -1,0 +1,83 @@
+{
+  "state": "waiting_for_imagegen_authentication",
+  "last_checked_goal_round": 8,
+  "generation_path": "DSH built-in imagegen (user-authorized); CLI fallback remains available with a local key",
+  "independently_verified_code_repairs": [
+    "CLI dry-run succeeds without a network request and logs no secret",
+    "row generation receives the listed reference images and look tasks include the pet-specific look-mechanics text",
+    "manifest paths are constrained to the run directory and completed jobs cannot be silently overwritten",
+    "approval requires deterministic QA plus explicit visual-review evidence"
+  ],
+  "environment_check": {
+    "OPENAI_API_KEY_present": false,
+    "OPENAI_BASE_URL": "unset"
+  },
+  "cli_preflight": {
+    "base_dry_run_exit_code": 0,
+    "api_call_made": false,
+    "output_image_created": false
+  },
+  "visual_jobs": {
+    "expected": 13,
+    "completed": 0
+  },
+  "historical_relay_error": "auth_not_found: no auth available for gpt-image-2; do not retry the same relay without a verified credential route",
+  "code_validation_round_2": {
+    "runner_dry_run_exit_code": 0,
+    "path_traversal_rejected": true,
+    "semantics_template_is_valid_json": true,
+    "cardinal_warning_is_rejected": true,
+    "PowerShell_entrypoints_parse": true
+  },
+  "project_preflight_round_3": {
+    "ok": true,
+    "ready_to_generate": false,
+    "job_count": 13,
+    "completed_jobs": 0,
+    "manifest_errors": 0,
+    "secret_like_literals_found": false
+  },
+  "cli_plan_dryrun_round_4": {
+    "ok": true,
+    "job_count": 13,
+    "successful_cli_payloads": 13,
+    "api_called": false,
+    "placeholder_references_used": true,
+    "ready_to_generate": false
+  },
+  "hatch_toolchain_round_5": {
+    "tool_count": 15,
+    "all_tools_present": true,
+    "all_help_commands_exit_zero": true
+  },
+  "secure_key_wrapper_round_6": {
+    "script_present": true,
+    "masked_local_prompt": true,
+    "key_persisted": false,
+    "dry_run_exit_code": 0,
+    "api_called": false
+  },
+  "auth_source_round_7": {
+    "imagegen_cli_auth_source": "OPENAI_API_KEY only",
+    "other_candidate_auth_env_names_present": false,
+    "current_process_has_key": false,
+    "network_retry_attempted": false
+  },
+  "final_round_checks": {
+    "project_preflight_ok": true,
+    "all_13_cli_payloads_valid": true,
+    "secure_wrapper_dry_run_exit_code": 0,
+    "api_called": false,
+    "decoded_images": 0,
+    "extended_atlas_present": false,
+    "package_zip_present": false
+  },
+  "built_in_imagegen_attempt": {
+    "attempted": true,
+    "result": "ChatGPT sign-in needs to be renewed",
+    "image_created": false,
+    "project_files_modified_by_attempt": false
+  },
+  "secrets_written": false,
+  "next_step": "Renew the DSH/ChatGPT sign-in for the built-in imagegen path and retry; alternatively use the local secure CLI wrapper with the user's own authorized OpenAI API key. Never search for or use leaked keys."
+}

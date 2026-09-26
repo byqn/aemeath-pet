@@ -1,0 +1,30 @@
+{
+  "ok": true,
+  "ready_to_generate": false,
+  "workspace": "C:\\Users\\32022\\Desktop\\000\\aemeath-pet",
+  "run_dir": "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run",
+  "expected_job_order": [
+    "base",
+    "idle",
+    "running-right",
+    "running-left",
+    "waving",
+    "jumping",
+    "failed",
+    "waiting",
+    "running",
+    "review",
+    "look-cardinals",
+    "look-row-9",
+    "look-row-10"
+  ],
+  "job_count": 13,
+  "completed_job_ids": [],
+  "chroma_key": "#FF00FF",
+  "api_key_present": false,
+  "secret_literal_files": [],
+  "errors": [],
+  "warnings": [
+    "OPENAI_API_KEY is absent; CLI dry-runs work, image generation cannot start"
+  ]
+}

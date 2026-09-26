@@ -1,0 +1,18 @@
+﻿{
+    "job_id":  "base",
+    "mode":  "generate",
+    "dry_run":  true,
+    "retried_bad_request":  false,
+    "output_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\decoded\\base.png",
+    "prompt_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\prompts\\base-pet.md",
+    "effective_prompt_path":  "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\work\\aemeath-run\\prompts\\base-pet.md",
+    "input_images":  [
+
+                     ],
+    "qa_outputs":  [
+
+                   ],
+    "cli_exit_code":  0,
+    "completed_at":  "2026-09-24T11:30:32.6294686Z",
+    "note":  "CLI 参数预检；未调用图像 API。"
+}

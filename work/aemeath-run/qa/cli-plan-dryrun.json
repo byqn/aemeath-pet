@@ -1,0 +1,234 @@
+﻿{
+    "ok":  true,
+    "ready_to_generate":  false,
+    "api_key_present":  false,
+    "api_called":  false,
+    "placeholder_references_used":  true,
+    "job_count":  13,
+    "results":  [
+                    {
+                        "id":  "base",
+                        "mode":  "generate",
+                        "exit_code":  0,
+                        "endpoint":  "/v1/images/generations",
+                        "expected_endpoint":  "/v1/images/generations",
+                        "model":  "gpt-image-2",
+                        "size":  "1024x1536",
+                        "reference_count":  0,
+                        "fallback_reference_paths":  [
+
+                                                     ],
+                        "look_mechanics_injected":  null,
+                        "api_called":  false
+                    },
+                    {
+                        "id":  "idle",
+                        "mode":  "edit",
+                        "exit_code":  0,
+                        "endpoint":  "/v1/images/edits",
+                        "expected_endpoint":  "/v1/images/edits",
+                        "model":  "gpt-image-2",
+                        "size":  "1536x512",
+                        "reference_count":  2,
+                        "fallback_reference_paths":  [
+                                                         "references/canonical-base.png"
+                                                     ],
+                        "look_mechanics_injected":  null,
+                        "api_called":  false
+                    },
+                    {
+                        "id":  "running-right",
+                        "mode":  "edit",
+                        "exit_code":  0,
+                        "endpoint":  "/v1/images/edits",
+                        "expected_endpoint":  "/v1/images/edits",
+                        "model":  "gpt-image-2",
+                        "size":  "1536x512",
+                        "reference_count":  2,
+                        "fallback_reference_paths":  [
+                                                         "references/canonical-base.png"
+                                                     ],
+                        "look_mechanics_injected":  null,
+                        "api_called":  false
+                    },
+                    {
+                        "id":  "running-left",
+                        "mode":  "edit",
+                        "exit_code":  0,
+                        "endpoint":  "/v1/images/edits",
+                        "expected_endpoint":  "/v1/images/edits",
+                        "model":  "gpt-image-2",
+                        "size":  "1536x512",
+                        "reference_count":  3,
+                        "fallback_reference_paths":  [
+                                                         "references/canonical-base.png",
+                                                         "decoded/running-right.png"
+                                                     ],
+                        "look_mechanics_injected":  null,
+                        "api_called":  false
+                    },
+                    {
+                        "id":  "waving",
+                        "mode":  "edit",
+                        "exit_code":  0,
+                        "endpoint":  "/v1/images/edits",
+                        "expected_endpoint":  "/v1/images/edits",
+                        "model":  "gpt-image-2",
+                        "size":  "1536x512",
+                        "reference_count":  2,
+                        "fallback_reference_paths":  [
+                                                         "references/canonical-base.png"
+                                                     ],
+                        "look_mechanics_injected":  null,
+                        "api_called":  false
+                    },
+                    {
+                        "id":  "jumping",
+                        "mode":  "edit",
+                        "exit_code":  0,
+                        "endpoint":  "/v1/images/edits",
+                        "expected_endpoint":  "/v1/images/edits",
+                        "model":  "gpt-image-2",
+                        "size":  "1536x512",
+                        "reference_count":  2,
+                        "fallback_reference_paths":  [
+                                                         "references/canonical-base.png"
+                                                     ],
+                        "look_mechanics_injected":  null,
+                        "api_called":  false
+                    },
+                    {
+                        "id":  "failed",
+                        "mode":  "edit",
+                        "exit_code":  0,
+                        "endpoint":  "/v1/images/edits",
+                        "expected_endpoint":  "/v1/images/edits",
+                        "model":  "gpt-image-2",
+                        "size":  "1536x512",
+                        "reference_count":  2,
+                        "fallback_reference_paths":  [
+                                                         "references/canonical-base.png"
+                                                     ],
+                        "look_mechanics_injected":  null,
+                        "api_called":  false
+                    },
+                    {
+                        "id":  "waiting",
+                        "mode":  "edit",
+                        "exit_code":  0,
+                        "endpoint":  "/v1/images/edits",
+                        "expected_endpoint":  "/v1/images/edits",
+                        "model":  "gpt-image-2",
+                        "size":  "1536x512",
+                        "reference_count":  2,
+                        "fallback_reference_paths":  [
+                                                         "references/canonical-base.png"
+                                                     ],
+                        "look_mechanics_injected":  null,
+                        "api_called":  false
+                    },
+                    {
+                        "id":  "running",
+                        "mode":  "edit",
+                        "exit_code":  0,
+                        "endpoint":  "/v1/images/edits",
+                        "expected_endpoint":  "/v1/images/edits",
+                        "model":  "gpt-image-2",
+                        "size":  "1536x512",
+                        "reference_count":  2,
+                        "fallback_reference_paths":  [
+                                                         "references/canonical-base.png"
+                                                     ],
+                        "look_mechanics_injected":  null,
+                        "api_called":  false
+                    },
+                    {
+                        "id":  "review",
+                        "mode":  "edit",
+                        "exit_code":  0,
+                        "endpoint":  "/v1/images/edits",
+                        "expected_endpoint":  "/v1/images/edits",
+                        "model":  "gpt-image-2",
+                        "size":  "1536x512",
+                        "reference_count":  2,
+                        "fallback_reference_paths":  [
+                                                         "references/canonical-base.png"
+                                                     ],
+                        "look_mechanics_injected":  null,
+                        "api_called":  false
+                    },
+                    {
+                        "id":  "look-cardinals",
+                        "mode":  "edit",
+                        "exit_code":  0,
+                        "endpoint":  "/v1/images/edits",
+                        "expected_endpoint":  "/v1/images/edits",
+                        "model":  "gpt-image-2",
+                        "size":  "1536x512",
+                        "reference_count":  3,
+                        "fallback_reference_paths":  [
+                                                         "references/canonical-base.png",
+                                                         "qa/contact-sheet.png"
+                                                     ],
+                        "look_mechanics_injected":  false,
+                        "api_called":  false
+                    },
+                    {
+                        "id":  "look-row-9",
+                        "mode":  "edit",
+                        "exit_code":  0,
+                        "endpoint":  "/v1/images/edits",
+                        "expected_endpoint":  "/v1/images/edits",
+                        "model":  "gpt-image-2",
+                        "size":  "1536x512",
+                        "reference_count":  4,
+                        "fallback_reference_paths":  [
+                                                         "references/canonical-base.png",
+                                                         "qa/contact-sheet.png",
+                                                         "decoded/look-anchors-approved.png"
+                                                     ],
+                        "look_mechanics_injected":  false,
+                        "api_called":  false
+                    },
+                    {
+                        "id":  "look-row-10",
+                        "mode":  "edit",
+                        "exit_code":  0,
+                        "endpoint":  "/v1/images/edits",
+                        "expected_endpoint":  "/v1/images/edits",
+                        "model":  "gpt-image-2",
+                        "size":  "1536x512",
+                        "reference_count":  5,
+                        "fallback_reference_paths":  [
+                                                         "references/canonical-base.png",
+                                                         "qa/contact-sheet.png",
+                                                         "decoded/look-anchors-approved.png",
+                                                         "decoded/look-row-9.png"
+                                                     ],
+                        "look_mechanics_injected":  false,
+                        "api_called":  false
+                    }
+                ],
+    "errors":  [
+
+               ],
+    "blockers":  [
+                     "idle: placeholder reference paths used",
+                     "running-right: placeholder reference paths used",
+                     "running-left: placeholder reference paths used",
+                     "waving: placeholder reference paths used",
+                     "jumping: placeholder reference paths used",
+                     "failed: placeholder reference paths used",
+                     "waiting: placeholder reference paths used",
+                     "running: placeholder reference paths used",
+                     "review: placeholder reference paths used",
+                     "look-cardinals: placeholder reference paths used",
+                     "look-cardinals: qa/look-mechanics.md is not written yet",
+                     "look-row-9: placeholder reference paths used",
+                     "look-row-9: qa/look-mechanics.md is not written yet",
+                     "look-row-10: placeholder reference paths used",
+                     "look-row-10: qa/look-mechanics.md is not written yet",
+                     "OPENAI_API_KEY is absent"
+                 ],
+    "note":  "CLI payload-only dry-run. ok validates CLI request construction only; blockers prevent production generation and no assets are created or approved."
+}

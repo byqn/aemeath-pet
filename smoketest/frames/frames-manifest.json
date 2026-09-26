@@ -1,0 +1,26 @@
+{
+  "ok": true,
+  "chroma_key": {
+    "hex": "#00FF00",
+    "rgb": [
+      0,
+      255,
+      0
+    ],
+    "threshold": 96.0
+  },
+  "rows": [
+    {
+      "state": "idle",
+      "frames": [
+        "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\smoketest\\frames\\idle\\00.png",
+        "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\smoketest\\frames\\idle\\01.png",
+        "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\smoketest\\frames\\idle\\02.png",
+        "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\smoketest\\frames\\idle\\03.png",
+        "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\smoketest\\frames\\idle\\04.png",
+        "C:\\Users\\32022\\Desktop\\000\\aemeath-pet\\smoketest\\frames\\idle\\05.png"
+      ],
+      "method": "slots"
+    }
+  ]
+}
