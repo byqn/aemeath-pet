@@ -85,39 +85,65 @@
 「查询余额」大概率会失败。这不是程序的问题，是官方没提供。
 
 
-接 AI 模型（重要）
-------------------
+接 AI 模型（在程序里直接填）
+----------------------------
 
-程序第一次启动时会在同目录生成 `ai-config.json`，用记事本打开填自己的：
+右键她 →「**API 设置…（自定义提供方）**」，弹出面板里填这些：
+
+  **选择或新建提供方**  下拉里选已有的，或直接输入新的 Provider ID
+  **Provider ID**       以小写字母开头，只能含小写字母、数字、连字符
+                        例如 acme-gateway。它用来唯一标识这个提供方，
+                        并用于派生凭据名（配置里就存在这个键下面）
+  **显示名称**          给自己看的名字，随意填
+  **API 地址**          例如 https://gateway.example/v1
+  **API 协议**          openai-completions（目前实际生效的就是它）
+  **API 密钥**          输入框默认打码，可勾「显示密钥」查看
+  **模型目录**          点「获取可用模型」会去拉 {地址}/models 的列表，
+                        从下拉里挑一个；也可以直接手输模型名
+  **保存并启用**        写入配置并立即生效，不用重启
+
+重复上面的步骤可以添加多个提供方，随时在下拉里切换。
+
+配置存在本机 `ai-config.json`（版本 2，多提供方结构）：
 
   {
-    "enabled":    false,                          ← 改成 true 才启用
-    "base_url":   "https://api.openai.com/v1",    ← 换成正副兼容地址
-    "api_key":    "",                             ← 填你自己的密钥
-    "model":      "gpt-4o-mini",                  ← 换成正副支持的模型名
-    "max_tokens": 120,
-    "timeout_seconds": 30,
-    "system_prompt": "你是《鸣潮》爱弥斯风格的桌面宠物…"
+    "version": 2,
+    "enabled": true,
+    "active_provider": "acme-gateway",
+    "providers": {
+      "acme-gateway": {
+        "display_name": "我的中转",
+        "base_url": "https://gateway.example/v1",
+        "protocol": "openai-completions",
+        "api_key": "……",
+        "model": "gpt-4o-mini",
+        "models": ["……"]
+      }
+    }
   }
 
-任何 **OpenAI 兼容**的接口都能接（官方、各种中转、本地 Ollama / LM Studio 等）：
+老版本那种扁平配置（enabled/base_url/api_key/model）会在启动时**自动迁移**
+成上面的结构，Provider ID 从主机名派生。
+
+任何 **OpenAI 兼容**的接口都能接：
 
   官方 OpenAI      https://api.openai.com/v1       模型如 gpt-4o-mini
   DeepSeek         https://api.deepseek.com/v1     模型 deepseek-chat
+  硅基流动         https://api.siliconflow.cn/v1   模型 Qwen/Qwen2.5-7B-Instruct
   本地 Ollama      http://localhost:11434/v1       模型 qwen2.5（密钥随便填）
   本地 LM Studio   http://localhost:1234/v1        密钥随便填
 
-填好后不用重启程序，右键「测试 AI 连接」就能验证。
+不开界面也能验证：
 
-也可以在命令行先验证，不用开界面：
-
-  powershell -NoProfile -STA -ExecutionPolicy Bypass -File AemeathPet.ps1 -TestAi
+  ... -File AemeathPet.ps1 -TestAi                  发一句话，看能不能通
+  ... -File AemeathPet.ps1 -ListModels              拉当前提供方的模型列表
+  ... -File AemeathPet.ps1 -ValidateProviderId abc  验证 ID 规则
 
 密钥只存在本机这个 json 里，程序不会打印、不会上传到任何地方。
-它只会在你主动点「和她说句话」或「测试 AI 连接」时才发请求。
+它只会在你主动点「和她说句话」「测试 AI 连接」「查询余额」时才发请求。
 
-**已知限制**：之前试过的 code0.ai 中转，它的 /v1/models 只列出 6 个图像模型、
-没有对话模型，所以那个 key 大概率聊不了天。要用对话功能，请换一个支持
+**已知限制**：code0.ai 那个中转的 /v1/models 只列出 6 个图像模型、
+没有对话模型，所以那个 key 大概率聊不了天。要用对话功能请换一个支持
 chat/completions 的接口。
 
 

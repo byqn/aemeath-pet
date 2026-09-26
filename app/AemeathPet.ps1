@@ -28,7 +28,11 @@ param(
     [int]$PerfTest = 0,
     # 命令行验证 AI 接线：发一次真实请求并打印结果，不开界面
     [switch]$TestAi,
-    [string]$TestAiPrompt = '用一句话打个招呼'
+    [string]$TestAiPrompt = '用一句话打个招呼',
+    # 命令行拉取当前提供方的模型列表（等价于点界面里的「获取可用模型」）
+    [switch]$ListModels,
+    # 命令行验证 Provider ID 规则（调用界面同一套校验函数）
+    [string]$ValidateProviderId = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -232,37 +236,344 @@ try {
     # 启动时先把上次没还回去的还掉，避免程序被强杀后东西一直留在肚子里
     $script:leftoverRestored = Restore-Belly -Quiet
 
-    # ── AI 对话（任何 OpenAI 兼容接口）──
-    # 密钥只放在本机 ai-config.json 里，程序不打印、不外传。
+    # ── AI 对话（可自定义提供方）──
+    # 配置结构（v2）：
+    #   providers 里按 Provider ID 存每个提供方，ID 同时用于派生凭据名；
+    #   active_provider 指向当前使用的那一个。密钥只存在本机，程序不打印、不外传。
     $configPath = Join-Path $scriptRoot 'ai-config.json'
-    $configTemplate = [ordered]@{
-        enabled    = $false
-        base_url   = 'https://api.openai.com/v1'
-        api_key    = ''
-        model      = 'gpt-4o-mini'
-        max_tokens = 120
-        timeout_seconds = 30
-        system_prompt = '你是《鸣潮》爱弥斯风格的桌面宠物，Q版、粉发、金色星形瞳孔。说话简短可爱、口语化，一般不超过 30 个字，不要用 markdown，不要自称 AI 或语言模型。'
+    $defaultSystemPrompt = '你是《鸣潮》爱弥斯风格的桌面宠物，Q版、粉发、金色星形瞳孔。说话简短可爱、口语化，一般不超过 30 个字，不要用 markdown，不要自称 AI 或语言模型。'
+
+    function New-ConfigSkeleton {
+        return [ordered]@{
+            version         = 2
+            enabled         = $false
+            active_provider = ''
+            providers       = [ordered]@{}
+            max_tokens      = 120
+            timeout_seconds = 30
+            system_prompt   = $defaultSystemPrompt
+        }
     }
+
+    function Get-ProviderIdFromUrl([string]$Url) {
+        # 老版扁平配置迁移时，用主机名派生一个合法的 Provider ID
+        try {
+            $host_ = ([Uri]$Url).Host.ToLower()
+            $id = ($host_ -replace '[^a-z0-9]+', '-').Trim('-')
+            if ($id -notmatch '^[a-z]') { $id = "p-$id" }
+            if ([string]::IsNullOrWhiteSpace($id)) { $id = 'default' }
+            return $id
+        }
+        catch { return 'default' }
+    }
+
+    function Test-ProviderId([string]$Id) {
+        # 以小写字母开头，只含小写字母、数字、连字符。
+        # 注意必须用 -cmatch：PowerShell 的 -match 默认不区分大小写，会把 'Acme' 放过。
+        return ($Id -cmatch '^[a-z][a-z0-9-]*$')
+    }
+
+    function Save-AiConfig([object]$Config) {
+        $Config | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $configPath -Encoding UTF8
+    }
+
     if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
-        ($configTemplate | ConvertTo-Json -Depth 5) | Set-Content -LiteralPath $configPath -Encoding UTF8
-        Write-Log "created ai-config.json template"
+        Save-AiConfig (New-ConfigSkeleton)
+        Write-Log 'created ai-config.json'
     }
+
     $script:aiConfig = $null
+    $script:aiProvider = $null
     $script:aiReady = $false
+
     function Reload-AiConfig() {
         try {
-            $script:aiConfig = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
-            $script:aiReady = (-not $NoAi) -and $script:aiConfig.enabled -and
-                              (-not [string]::IsNullOrWhiteSpace($script:aiConfig.api_key))
+            $raw = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
         }
         catch {
             $script:aiConfig = $null
+            $script:aiProvider = $null
             $script:aiReady = $false
             Write-Log "ai-config.json 解析失败：$($_.Exception.Message)"
+            return
         }
+        # 老版扁平配置（enabled/base_url/api_key/model）自动迁移成 v2
+        if ($null -eq $raw.providers) {
+            $migrated = New-ConfigSkeleton
+            $migrated.enabled = [bool]$raw.enabled
+            if ($raw.max_tokens) { $migrated.max_tokens = [int]$raw.max_tokens }
+            if ($raw.timeout_seconds) { $migrated.timeout_seconds = [int]$raw.timeout_seconds }
+            if ($raw.system_prompt) { $migrated.system_prompt = [string]$raw.system_prompt }
+            if (-not [string]::IsNullOrWhiteSpace($raw.base_url)) {
+                $id = Get-ProviderIdFromUrl $raw.base_url
+                $migrated.providers[$id] = [ordered]@{
+                    display_name = $id
+                    base_url     = [string]$raw.base_url
+                    protocol     = 'openai-completions'
+                    api_key      = if ($raw.api_key) { [string]$raw.api_key } else { '' }
+                    model        = if ($raw.model) { [string]$raw.model } else { 'gpt-4o-mini' }
+                    models       = @()
+                }
+                $migrated.active_provider = $id
+            }
+            Save-AiConfig $migrated
+            Write-Log 'ai-config.json 已从旧版迁移到 v2（多提供方）'
+            $script:aiConfig = $migrated | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+        }
+        else {
+            $script:aiConfig = $raw
+        }
+
+        $script:aiProvider = $null
+        $activeId = [string]$script:aiConfig.active_provider
+        if (-not [string]::IsNullOrWhiteSpace($activeId) -and $script:aiConfig.providers.PSObject.Properties[$activeId]) {
+            $script:aiProvider = $script:aiConfig.providers.$activeId
+            $script:aiProvider | Add-Member -NotePropertyName '_id' -NotePropertyValue $activeId -Force
+        }
+        $script:aiReady = (-not $NoAi) -and $script:aiConfig.enabled -and $null -ne $script:aiProvider -and
+                          (-not [string]::IsNullOrWhiteSpace($script:aiProvider.api_key)) -and
+                          (-not [string]::IsNullOrWhiteSpace($script:aiProvider.base_url))
     }
     Reload-AiConfig
+
+    function Get-ActiveProviderSummary {
+        if ($null -eq $script:aiProvider) { return '（未选择提供方）' }
+        $p = $script:aiProvider
+        return "$($p._id) / $($p.display_name) / $($p.protocol) / $($p.model)"
+    }
+
+    function Invoke-ModelsFetch([string]$BaseUrl, [string]$ApiKey, [string]$Protocol) {
+        # 拉取可用模型列表；返回 @{ ok=...; models=@(); message=... }
+        $result = @{ ok = $false; models = @(); message = '' }
+        $url = $BaseUrl.TrimEnd('/')
+        if ($Protocol -eq 'openai-responses') { $endpoint = "$url/models" } else { $endpoint = "$url/models" }
+        try {
+            $headers = @{ Authorization = "Bearer $ApiKey" }
+            $response = Invoke-RestMethod -Uri $endpoint -Headers $headers -Method Get -TimeoutSec 15
+            $ids = @($response.data | ForEach-Object { $_.id } | Where-Object { $_ }) | Sort-Object -Unique
+            if ($ids.Count -eq 0) {
+                $result.message = '接口返回里没有模型列表'
+                return $result
+            }
+            $result.ok = $true
+            $result.models = $ids
+            return $result
+        }
+        catch {
+            $status = ''
+            try { $status = [int]$_.Exception.Response.StatusCode } catch { }
+            $result.message = if ($status) { "HTTP $status" } else { $_.Exception.Message }
+            return $result
+        }
+    }
+
+    function Show-ApiSettings {
+        $dlg = New-Object System.Windows.Window
+        $dlg.Title = 'API 设置 — 自定义提供方'
+        $dlg.Width = 560
+        $dlg.Height = 640
+        $dlg.WindowStartupLocation = [System.Windows.WindowStartupLocation]::CenterScreen
+        $dlg.ResizeMode = [System.Windows.ResizeMode]::NoResize
+        $dlg.Topmost = $true
+
+        $panel = New-Object System.Windows.Controls.StackPanel
+        $panel.Margin = New-Object System.Windows.Thickness(16)
+
+        function Add-Field([string]$Label, [string]$Hint, [object]$Control) {
+            $lb = New-Object System.Windows.Controls.TextBlock
+            $lb.Text = $Label
+            $lb.FontWeight = [System.Windows.FontWeights]::Bold
+            $lb.Margin = New-Object System.Windows.Thickness(0, 8, 0, 2)
+            $panel.Children.Add($lb) | Out-Null
+            if ($Hint) {
+                $hb = New-Object System.Windows.Controls.TextBlock
+                $hb.Text = $Hint
+                $hb.FontSize = 11
+                $hb.Foreground = [System.Windows.Media.Brushes]::Gray
+                $hb.TextWrapping = [System.Windows.TextWrapping]::Wrap
+                $hb.Margin = New-Object System.Windows.Thickness(0, 0, 0, 2)
+                $panel.Children.Add($hb) | Out-Null
+            }
+            $Control.Margin = New-Object System.Windows.Thickness(0, 0, 0, 2)
+            $panel.Children.Add($Control) | Out-Null
+        }
+
+        # 已有提供方下拉
+        $providerCombo = New-Object System.Windows.Controls.ComboBox
+        $existingIds = @()
+        if ($script:aiConfig -and $script:aiConfig.providers) {
+            $existingIds = @($script:aiConfig.providers.PSObject.Properties.Name)
+        }
+        foreach ($id in $existingIds) { [void]$providerCombo.Items.Add($id) }
+        $providerCombo.IsEditable = $true
+        if ($script:aiProvider) { $providerCombo.Text = $script:aiProvider._id }
+        Add-Field '选择或新建提供方' '从下拉里选一个已有的，或直接输入新的 Provider ID' $providerCombo
+
+        $idBox = New-Object System.Windows.Controls.TextBox
+        Add-Field 'Provider ID' '以小写字母开头，只能含小写字母、数字、连字符；用于标识该提供方并派生凭据名' $idBox
+
+        $nameBox = New-Object System.Windows.Controls.TextBox
+        Add-Field '显示名称' '给自己看的名字，随意填' $nameBox
+
+        $urlBox = New-Object System.Windows.Controls.TextBox
+        Add-Field 'API 地址' '例如 https://gateway.example/v1' $urlBox
+
+        $protocolCombo = New-Object System.Windows.Controls.ComboBox
+        [void]$protocolCombo.Items.Add('openai-completions')
+        [void]$protocolCombo.Items.Add('openai-responses')
+        $protocolCombo.SelectedIndex = 0
+        Add-Field 'API 协议' '目前实际走 /chat/completions 的是 openai-completions' $protocolCombo
+
+        $keyBox = New-Object System.Windows.Controls.PasswordBox
+        Add-Field 'API 密钥' '只保存在本机 ai-config.json，不会上传到任何地方' $keyBox
+
+        $showKey = New-Object System.Windows.Controls.CheckBox
+        $showKey.Content = '显示密钥'
+        $panel.Children.Add($showKey) | Out-Null
+        $keyPlain = New-Object System.Windows.Controls.TextBox
+        $keyPlain.Visibility = [System.Windows.Visibility]::Collapsed
+        $panel.Children.Add($keyPlain) | Out-Null
+
+        # 模型目录
+        $modelRow = New-Object System.Windows.Controls.DockPanel
+        $fetchBtn = New-Object System.Windows.Controls.Button
+        $fetchBtn.Content = '获取可用模型'
+        $fetchBtn.Width = 130
+        $fetchBtn.Margin = New-Object System.Windows.Thickness(0, 0, 8, 0)
+        [System.Windows.Controls.DockPanel]::SetDock($fetchBtn, [System.Windows.Controls.Dock]::Right)
+        $modelCombo = New-Object System.Windows.Controls.ComboBox
+        $modelCombo.IsEditable = $true
+        $modelRow.Children.Add($fetchBtn) | Out-Null
+        $modelRow.Children.Add($modelCombo) | Out-Null
+        Add-Field '模型目录' '点右侧按钮拉取列表，也可以直接手输模型名' $modelRow
+
+        $statusText = New-Object System.Windows.Controls.TextBlock
+        $statusText.TextWrapping = [System.Windows.TextWrapping]::Wrap
+        $statusText.Foreground = [System.Windows.Media.Brushes]::DimGray
+        $statusText.Margin = New-Object System.Windows.Thickness(0, 8, 0, 0)
+        $panel.Children.Add($statusText) | Out-Null
+
+        $buttons = New-Object System.Windows.Controls.StackPanel
+        $buttons.Orientation = [System.Windows.Controls.Orientation]::Horizontal
+        $buttons.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Right
+        $buttons.Margin = New-Object System.Windows.Thickness(0, 12, 0, 0)
+        $saveBtn = New-Object System.Windows.Controls.Button
+        $saveBtn.Content = '保存并启用'
+        $saveBtn.Width = 110
+        $saveBtn.Margin = New-Object System.Windows.Thickness(0, 0, 8, 0)
+        $cancelBtn = New-Object System.Windows.Controls.Button
+        $cancelBtn.Content = '取消'
+        $cancelBtn.Width = 80
+        $buttons.Children.Add($saveBtn) | Out-Null
+        $buttons.Children.Add($cancelBtn) | Out-Null
+        $panel.Children.Add($buttons) | Out-Null
+        $dlg.Content = $panel
+
+        $loadProvider = {
+            $id = $providerCombo.Text.Trim()
+            if ([string]::IsNullOrWhiteSpace($id) -or $null -eq $script:aiConfig -or $null -eq $script:aiConfig.providers) { return }
+            $prop = $script:aiConfig.providers.PSObject.Properties[$id]
+            if (-not $prop) { return }
+            $p = $prop.Value
+            $idBox.Text = $id
+            $nameBox.Text = [string]$p.display_name
+            $urlBox.Text = [string]$p.base_url
+            if ($p.protocol) { $protocolCombo.SelectedItem = [string]$p.protocol }
+            $keyBox.Password = [string]$p.api_key
+            $keyPlain.Text = [string]$p.api_key
+            $modelCombo.Text = [string]$p.model
+            $modelCombo.Items.Clear()
+            foreach ($m in @($p.models)) { [void]$modelCombo.Items.Add($m) }
+            $statusText.Text = "已载入提供方 $id"
+        }
+        $providerCombo.Add_SelectionChanged({ & $loadProvider })
+        $providerCombo.Add_LostFocus({ & $loadProvider })
+
+        $showKey.Add_Click({
+            if ($showKey.IsChecked) {
+                $keyPlain.Text = $keyBox.Password
+                $keyPlain.Visibility = [System.Windows.Visibility]::Visible
+                $keyBox.Visibility = [System.Windows.Visibility]::Collapsed
+            }
+            else {
+                $keyBox.Password = $keyPlain.Text
+                $keyPlain.Visibility = [System.Windows.Visibility]::Collapsed
+                $keyBox.Visibility = [System.Windows.Visibility]::Visible
+            }
+        })
+        $keyPlain.Add_TextChanged({ $keyBox.Password = $keyPlain.Text })
+
+        $fetchBtn.Add_Click({
+            $url = $urlBox.Text.Trim()
+            $key = if ($keyBox.Visibility -eq [System.Windows.Visibility]::Visible) { $keyBox.Password } else { $keyPlain.Text }
+            if ([string]::IsNullOrWhiteSpace($url)) { $statusText.Text = '先填 API 地址'; return }
+            $statusText.Text = '正在拉取模型列表…'
+            $dlg.Cursor = [System.Windows.Input.Cursors]::Wait
+            try {
+                $r = Invoke-ModelsFetch $url $key ([string]$protocolCombo.SelectedItem)
+                if ($r.ok) {
+                    $modelCombo.Items.Clear()
+                    foreach ($m in $r.models) { [void]$modelCombo.Items.Add($m) }
+                    if ([string]::IsNullOrWhiteSpace($modelCombo.Text) -and $r.models.Count -gt 0) { $modelCombo.Text = $r.models[0] }
+                    $statusText.Text = "拉到 $($r.models.Count) 个模型，从下拉里挑一个"
+                }
+                else {
+                    $statusText.Text = "拉取失败：$($r.message)（可以直接手输模型名）"
+                }
+            }
+            finally { $dlg.Cursor = [System.Windows.Input.Cursors]::Arrow }
+        })
+
+        $saveBtn.Add_Click({
+            # 统一转小写，避免用户输入大写后与规则冲突（规则见 Test-ProviderId）
+            $id = $idBox.Text.Trim().ToLower()
+            if (-not (Test-ProviderId $id)) { $statusText.Text = 'Provider ID 不合规：要以小写字母开头，只能含小写字母、数字、连字符'; return }
+            $url = $urlBox.Text.Trim()
+            if ([string]::IsNullOrWhiteSpace($url) -or $url -notmatch '^https?://') { $statusText.Text = 'API 地址要以 http:// 或 https:// 开头'; return }
+            $key = if ($keyBox.Visibility -eq [System.Windows.Visibility]::Visible) { $keyBox.Password } else { $keyPlain.Text }
+            if ([string]::IsNullOrWhiteSpace($key)) { $statusText.Text = 'API 密钥不能为空（本地服务随便填几个字符）'; return }
+            $model = $modelCombo.Text.Trim()
+            if ([string]::IsNullOrWhiteSpace($model)) { $statusText.Text = '还没选模型：点「获取可用模型」或直接手输'; return }
+
+            $models = @()
+            foreach ($item in $modelCombo.Items) { $models += [string]$item }
+            $display = if ([string]::IsNullOrWhiteSpace($nameBox.Text)) { $id } else { $nameBox.Text.Trim() }
+
+            $cfg = $script:aiConfig
+            if ($null -eq $cfg) { $cfg = New-ConfigSkeleton | ConvertTo-Json -Depth 8 | ConvertFrom-Json }
+            if ($null -eq $cfg.providers) { $cfg | Add-Member -NotePropertyName providers -NotePropertyValue ([pscustomobject]@{}) -Force }
+            $entry = [ordered]@{
+                display_name = $display
+                base_url     = $url
+                protocol     = [string]$protocolCombo.SelectedItem
+                api_key      = $key
+                model        = $model
+                models       = $models
+            }
+            $cfg.providers | Add-Member -NotePropertyName $id -NotePropertyValue ($entry | ConvertTo-Json -Depth 6 | ConvertFrom-Json) -Force
+            $cfg.active_provider = $id
+            $cfg.enabled = $true
+            if (-not $cfg.version) { $cfg | Add-Member -NotePropertyName version -NotePropertyValue 2 -Force }
+            if (-not $cfg.max_tokens) { $cfg | Add-Member -NotePropertyName max_tokens -NotePropertyValue 120 -Force }
+            if (-not $cfg.timeout_seconds) { $cfg | Add-Member -NotePropertyName timeout_seconds -NotePropertyValue 30 -Force }
+            if (-not $cfg.system_prompt) { $cfg | Add-Member -NotePropertyName system_prompt -NotePropertyValue $defaultSystemPrompt -Force }
+            Save-AiConfig $cfg
+            Write-Log "provider saved: $id ($url, model=$model)"
+            $dlg.Close()
+        })
+        $cancelBtn.Add_Click({ $dlg.Close() })
+
+        # 打开时预填当前提供方
+        if ($script:aiProvider) { & $loadProvider }
+        elseif ($script:aiConfig -and $script:aiConfig.providers) {
+            $first = @($script:aiConfig.providers.PSObject.Properties.Name) | Select-Object -First 1
+            if ($first) { $providerCombo.Text = $first; & $loadProvider }
+        }
+
+        $dlg.ShowDialog() | Out-Null
+        Reload-AiConfig
+        Show-Bubble (Get-AiStatusText) 8000
+    }
 
     try {
         [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
@@ -290,7 +601,8 @@ try {
 
     # ── 余额查询：不同服务商接口不同，按 base_url 猜，猜不到就依次试 ──
     function Get-BalanceEndpoints {
-        $base = $script:aiConfig.base_url.TrimEnd('/')
+        if ($null -eq $script:aiProvider) { return @() }
+        $base = ([string]$script:aiProvider.base_url).TrimEnd('/')
         $host_ = ''
         try { $host_ = ([Uri]$base).Host.ToLower() } catch { }
         if ($host_ -like '*deepseek*') { return @("$base/user/balance") }
@@ -312,7 +624,7 @@ try {
         try {
             $script:http.Timeout = [TimeSpan]::FromSeconds(15)
             $script:http.DefaultRequestHeaders.Authorization =
-                New-Object System.Net.Http.Headers.AuthenticationHeaderValue('Bearer', $script:aiConfig.api_key)
+                New-Object System.Net.Http.Headers.AuthenticationHeaderValue('Bearer', $script:aiProvider.api_key)
             $endpoints = Get-BalanceEndpoints
             $script:balanceTried = $endpoints
             $script:httpTask = $script:http.GetAsync($endpoints[0])
@@ -372,10 +684,11 @@ try {
     }
 
     function Get-AiStatusText() {
-        if ($null -eq $script:aiConfig) { return 'AI：配置文件损坏' }
-        if (-not $script:aiConfig.enabled) { return 'AI：未启用（改 ai-config.json 里的 enabled）' }
-        if ([string]::IsNullOrWhiteSpace($script:aiConfig.api_key)) { return 'AI：未填 api_key' }
-        return "AI：已就绪（$($script:aiConfig.model)）"
+        if ($null -eq $script:aiConfig) { return 'AI：配置文件坏了' }
+        if ($null -eq $script:aiProvider) { return 'AI：还没配置提供方（右键 → API 设置）' }
+        if (-not $script:aiConfig.enabled) { return "AI：已配置 $($script:aiProvider._id) 但未启用" }
+        if ([string]::IsNullOrWhiteSpace($script:aiProvider.api_key)) { return "AI：$($script:aiProvider._id) 还没填密钥" }
+        return "AI：$($script:aiProvider.display_name)（$($script:aiProvider.model)）"
     }
 
     function Start-AiRequest([string]$UserText) {
@@ -393,7 +706,7 @@ try {
         [void]$messages.Add(@{ role = 'user'; content = $UserText })
 
         $body = @{
-            model      = $script:aiConfig.model
+            model      = $script:aiProvider.model
             messages   = $messages.ToArray()
             max_tokens = [int]$script:aiConfig.max_tokens
         } | ConvertTo-Json -Depth 6
@@ -401,9 +714,9 @@ try {
         try {
             $script:http.Timeout = [TimeSpan]::FromSeconds([int]$script:aiConfig.timeout_seconds)
             $script:http.DefaultRequestHeaders.Authorization =
-                New-Object System.Net.Http.Headers.AuthenticationHeaderValue('Bearer', $script:aiConfig.api_key)
+                New-Object System.Net.Http.Headers.AuthenticationHeaderValue('Bearer', $script:aiProvider.api_key)
             $content = New-Object System.Net.Http.StringContent($body, [System.Text.Encoding]::UTF8, 'application/json')
-            $url = $script:aiConfig.base_url.TrimEnd('/') + '/chat/completions'
+            $url = ([string]$script:aiProvider.base_url).TrimEnd('/') + '/chat/completions'
             # 异步发出，交给主循环轮询；同步调用会把界面卡死
             $script:httpTask = $script:http.PostAsync($url, $content)
             $script:httpTaskKind = 'chat'
@@ -840,6 +1153,7 @@ try {
     } $true $false | Out-Null
     $speakItem = $menu.Items[$menu.Items.Count - 1]
     $menu.Items.Add((New-Object System.Windows.Controls.Separator)) | Out-Null
+    Add-MenuItem 'API 设置…（自定义提供方）' { Show-ApiSettings } | Out-Null
     Add-MenuItem '和她说句话…' {
         $text = Read-UserText
         if (-not [string]::IsNullOrWhiteSpace($text)) {
@@ -918,27 +1232,58 @@ try {
         exit 0
     }
 
+    if ($ValidateProviderId -ne '') {
+        "规则：以小写字母开头，只能含小写字母、数字、连字符  ^[a-z][a-z0-9-]*$"
+        foreach ($sample in @($ValidateProviderId, 'acme-gateway', 'Acme', '1abc', 'my_relay', 'a')) {
+            $ok = Test-ProviderId $sample
+            "  '{0}' -> {1}" -f $sample, $(if ($ok) { '通过' } else { '拒绝' })
+        }
+        exit 0
+    }
+
+    if ($ListModels) {
+        if ($null -eq $script:aiProvider) { 'FAILED 还没配置提供方（右键 → API 设置）'; exit 2 }
+        "提供方：$($script:aiProvider._id)  $($script:aiProvider.base_url)"
+        if ([string]::IsNullOrWhiteSpace($script:aiProvider.api_key)) { 'FAILED 未填密钥'; exit 2 }
+        $r = Invoke-ModelsFetch $script:aiProvider.base_url $script:aiProvider.api_key $script:aiProvider.protocol
+        if ($r.ok) {
+            "拉到 $($r.models.Count) 个模型："
+            $r.models | ForEach-Object { "  $_" }
+            'LISTMODELS_OK'
+            exit 0
+        }
+        "拉取失败：$($r.message)"
+        'LISTMODELS_FAILED'
+        exit 1
+    }
+
     if ($TestAi) {
         "AI 配置文件：$configPath"
         if ($null -eq $script:aiConfig) { "FAILED 配置无法解析"; exit 1 }
         "  enabled = $($script:aiConfig.enabled)"
-        "  base_url = $($script:aiConfig.base_url)"
-        "  model = $($script:aiConfig.model)"
-        "  api_key = $(if ([string]::IsNullOrWhiteSpace($script:aiConfig.api_key)) { '(空)' } else { '已填写（长度 ' + $script:aiConfig.api_key.Length + '）' })"
+        "  提供方数量 = $(@($script:aiConfig.providers.PSObject.Properties.Name).Count)"
+        "  当前提供方 = $(if ($script:aiProvider) { $script:aiProvider._id } else { '(无)' })"
+        if ($script:aiProvider) {
+            "    display_name = $($script:aiProvider.display_name)"
+            "    protocol = $($script:aiProvider.protocol)"
+            "    base_url = $($script:aiProvider.base_url)"
+            "    model = $($script:aiProvider.model)"
+            "    api_key = $(if ([string]::IsNullOrWhiteSpace($script:aiProvider.api_key)) { '(空)' } else { '已填写（长度 ' + $script:aiProvider.api_key.Length + '）' })"
+        }
         "  余额端点（按服务商推断，失败会自动依次重试）= $(Get-BalanceEndpoints -join '  ->  ')"
-        if (-not $script:aiReady) { "SKIPPED 未启用或未填 api_key；请先编辑 ai-config.json"; exit 2 }
+        if (-not $script:aiReady) { "SKIPPED 未启用或未选提供方或未填密钥；右键 → API 设置"; exit 2 }
         $messages = @(
             @{ role = 'system'; content = $script:aiConfig.system_prompt },
             @{ role = 'user'; content = $TestAiPrompt }
         )
-        $body = @{ model = $script:aiConfig.model; messages = $messages; max_tokens = [int]$script:aiConfig.max_tokens } | ConvertTo-Json -Depth 6
+        $body = @{ model = $script:aiProvider.model; messages = $messages; max_tokens = [int]$script:aiConfig.max_tokens } | ConvertTo-Json -Depth 6
         try {
             $testClient = New-Object System.Net.Http.HttpClient
             $testClient.Timeout = [TimeSpan]::FromSeconds([int]$script:aiConfig.timeout_seconds)
             $testClient.DefaultRequestHeaders.Authorization =
-                New-Object System.Net.Http.Headers.AuthenticationHeaderValue('Bearer', $script:aiConfig.api_key)
+                New-Object System.Net.Http.Headers.AuthenticationHeaderValue('Bearer', $script:aiProvider.api_key)
             $content = New-Object System.Net.Http.StringContent($body, [System.Text.Encoding]::UTF8, 'application/json')
-            $url = $script:aiConfig.base_url.TrimEnd('/') + '/chat/completions'
+            $url = ([string]$script:aiProvider.base_url).TrimEnd('/') + '/chat/completions'
             $response = $testClient.PostAsync($url, $content).GetAwaiter().GetResult()
             $text = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
             "HTTP $([int]$response.StatusCode)"
