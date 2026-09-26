@@ -647,6 +647,12 @@ try {
 
     # ── 用量统计：每次回复里的 usage 累加 ──
     $script:usage = [ordered]@{ calls = 0; prompt = 0; completion = 0; total = 0; last = $null }
+    # 点击她时显示的状态；余额有 60 秒缓存，避免连点就狂发请求
+    $script:clickShowsStatus = $true
+    $script:lastBalance = ''
+    $script:balanceFetchedAt = [DateTime]::MinValue
+    $script:balancePending = ''   # 必须是空字符串：布尔 $false 会被当成“有值”而显示成 False
+
     function Get-UsageText {
         if ($script:usage.calls -eq 0) { return '本次会话还没调用过' }
         $u = $script:usage
@@ -655,6 +661,38 @@ try {
             $lastText = "  上次：入 $($u.last.prompt) / 出 $($u.last.completion)"
         }
         return "调用 $($u.calls) 次；输入 $($u.prompt) tokens，输出 $($u.completion) tokens，合计 $($u.total)$lastText"
+    }
+
+    function Get-UsageShort {
+        $u = $script:usage
+        if ($u.calls -eq 0) { return '还没聊过' }
+        return "$($u.calls) 次 · 入 $($u.prompt) / 出 $($u.completion) · 共 $($u.total) tokens"
+    }
+
+    function Get-BalanceShort {
+        if (-not [string]::IsNullOrWhiteSpace($script:balancePending)) { return $script:balancePending }
+        if ([string]::IsNullOrWhiteSpace($script:lastBalance)) {
+            if ($null -eq $script:aiProvider) { return '未配置提供方' }
+            return '未查询'
+        }
+        $age = [int]((Get-Date) - $script:balanceFetchedAt).TotalSeconds
+        return "$($script:lastBalance)（$age 秒前）"
+    }
+
+    function Show-PetStatus {
+        # 点击她时调用：用量立刻显示，余额异步查询或走缓存
+        if ($null -eq $script:aiProvider) {
+            Show-Bubble "用量：$(Get-UsageShort)`n余额：未配置提供方（右键 → API 设置）" 9000
+            return
+        }
+        $fresh = ((Get-Date) - $script:balanceFetchedAt).TotalSeconds -lt 60
+        if ($fresh -and -not [string]::IsNullOrWhiteSpace($script:lastBalance)) {
+            Show-Bubble "用量：$(Get-UsageShort)`n余额：$(Get-BalanceShort)" 10000
+            return
+        }
+        $script:balancePending = '查询中…'
+        Show-Bubble "用量：$(Get-UsageShort)`n余额：查询中…" 15000
+        Start-BalanceQuery
     }
 
     # ── 余额查询：不同服务商接口不同，按 base_url 猜，猜不到就依次试 ──
@@ -712,7 +750,8 @@ try {
                     return
                 }
                 $script:httpBusy = $false
-                Show-Bubble "该接口没有可用的余额端点（已试 $($script:balanceTried.Count) 个）" 8000
+                $script:balancePending = ''
+                Show-Bubble "用量：$(Get-UsageShort)`n余额：该接口没有可用的余额端点" 9000
                 Write-Log "balance failed: $($script:balanceTried -join ', ')"
                 return
             }
@@ -727,17 +766,18 @@ try {
             elseif ($parsed.balance) { $summary = "$($parsed.balance)" }
             elseif ($parsed.total_available) { $summary = "$($parsed.total_available)" }
             if ([string]::IsNullOrWhiteSpace($summary)) {
-                $preview = $text.Substring(0, [Math]::Min(160, $text.Length))
-                Show-Bubble "余额：$preview" 12000
+                $summary = $text.Substring(0, [Math]::Min(120, $text.Length))
             }
-            else {
-                Show-Bubble "余额：$summary" 12000
-            }
+            $script:lastBalance = $summary
+            $script:balanceFetchedAt = Get-Date
+            $script:balancePending = ''
+            Show-Bubble "用量：$(Get-UsageShort)`n余额：$summary" 12000
             Write-Log "balance ok: $text"
         }
         catch {
             $script:httpBusy = $false
-            Show-Bubble '余额解析失败' 8000
+            $script:balancePending = ''
+            Show-Bubble "用量：$(Get-UsageShort)`n余额：解析失败" 9000
             Write-Log "balance parse failed: $($_.Exception.Message)"
         }
     }
@@ -1028,6 +1068,98 @@ try {
         return $script:centerCache
     }
 
+    # ── 表情编排：用已有的帧组合出新动作，不需要重新生成素材 ──
+    $script:emoteQueue = @()
+    $script:emoteIndex = 0
+    $script:emoteTicks = 0
+    $script:emoteName = ''
+    $script:sleeping = $false
+    $script:cuteLines = @(
+        '在的呀～', '（眨眨眼）', '今天也要加油哦', '嗯…在想事情',
+        '你忙你的，我看着', '（晃了晃发梢）', '呜…有点困', '要不要休息一下？'
+    )
+
+    function Start-Emote([string]$Name) {
+        $steps = New-Object System.Collections.ArrayList
+        switch ($Name) {
+            'nod' {
+                # 点头：低头抬头交替
+                foreach ($i in 1..3) {
+                    [void]$steps.Add(@{ row = 10; col = 0; ticks = 2 })
+                    [void]$steps.Add(@{ row = 9; col = 0; ticks = 2 })
+                }
+            }
+            'shake' {
+                # 摇头：左右交替
+                foreach ($i in 1..3) {
+                    [void]$steps.Add(@{ row = 9; col = 4; ticks = 2 })
+                    [void]$steps.Add(@{ row = 10; col = 4; ticks = 2 })
+                }
+            }
+            'spin' {
+                # 转圈：把 16 个方向快速走一遍，再晕一下
+                foreach ($c in 0..7) { [void]$steps.Add(@{ row = 9; col = $c; ticks = 1 }) }
+                foreach ($c in 0..7) { [void]$steps.Add(@{ row = 10; col = $c; ticks = 1 }) }
+                foreach ($c in 0..7) { [void]$steps.Add(@{ row = 5; col = $c; ticks = 2 }) }
+            }
+            'cute' {
+                # 卖萌：跳一下再挥手
+                foreach ($c in 0..4) { [void]$steps.Add(@{ row = 4; col = $c; ticks = 3 }) }
+                foreach ($c in 0..3) { [void]$steps.Add(@{ row = 3; col = $c; ticks = 3 }) }
+            }
+            'dance' {
+                # 跳舞：左右摆动 + 挥手 + 跳
+                foreach ($i in 1..2) {
+                    [void]$steps.Add(@{ row = 9; col = 4; ticks = 2 })
+                    [void]$steps.Add(@{ row = 3; col = 0; ticks = 2 })
+                    [void]$steps.Add(@{ row = 10; col = 4; ticks = 2 })
+                    [void]$steps.Add(@{ row = 3; col = 2; ticks = 2 })
+                    [void]$steps.Add(@{ row = 4; col = 1; ticks = 2 })
+                    [void]$steps.Add(@{ row = 4; col = 3; ticks = 2 })
+                }
+            }
+            'stretch' {
+                # 伸懒腰：慢慢转一圈再回到正面
+                foreach ($c in 0..7) { [void]$steps.Add(@{ row = 9; col = $c; ticks = 2 }) }
+                foreach ($c in 0..7) { [void]$steps.Add(@{ row = 10; col = $c; ticks = 2 }) }
+            }
+            default { return }
+        }
+        $script:emoteQueue = $steps.ToArray()
+        $script:emoteIndex = 0
+        $script:emoteTicks = 0
+        $script:emoteName = $Name
+        $script:mode = 'emote'
+        $script:sleeping = $false
+        switch ($Name) {
+            'nod' { Play-Sound 'step' }
+            'shake' { Play-Sound 'step' }
+            'spin' { Play-Sound 'review' }
+            'cute' { Play-Sound 'hello' }
+            'dance' { Play-Sound 'jump' }
+            'stretch' { Play-Sound 'chirp' }
+        }
+    }
+
+    function Start-Sleep2 {
+        $script:sleeping = $true
+        $script:mode = 'sleep'
+        $script:frameTick = 0
+        Show-Bubble 'Zzz…' 4000
+        Play-Sound 'chirp'
+    }
+
+    function Wake-Up {
+        if (-not $script:sleeping) { return }
+        $script:sleeping = $false
+        $script:mode = 'idle'
+        $script:frameTick = 0
+        $script:col = 0
+        $script:idleTicks = 0
+        $script:nextDecision = $script:random.Next(14, 40)
+        Start-OneShot $RowWave ($rowFrames[$RowWave] * 3) 'hello'
+    }
+
     function Start-Walk() {
         $minX = $script:work.Left + 8
         $maxX = $script:work.Right - $window.Width - 8
@@ -1080,6 +1212,34 @@ try {
             return
         }
 
+        if ($script:mode -eq 'emote') {
+            Set-FrameInterval $OneShotFrameMs
+            if ($script:emoteIndex -ge $script:emoteQueue.Count) {
+                $script:mode = 'idle'
+                $script:frameTick = 0
+                $script:col = 0
+                $script:idleTicks = 0
+                $script:nextDecision = $script:random.Next(14, 40)
+                return
+            }
+            $step = $script:emoteQueue[$script:emoteIndex]
+            Show-Cell $step.row $step.col
+            $script:emoteTicks++
+            if ($script:emoteTicks -ge $step.ticks) {
+                $script:emoteTicks = 0
+                $script:emoteIndex++
+            }
+            return
+        }
+
+        if ($script:mode -eq 'sleep') {
+            # 睡觉：停在闭眼那一帧，偶尔冒个 Zzz；点她或拖她就会醒
+            Set-FrameInterval 400
+            Show-Cell $RowIdle 1
+            if ($script:frameTick % 10 -eq 0) { Show-Bubble 'Zzz…' 2500 }
+            return
+        }
+
         if ($script:mode -eq 'walk') {
             Set-FrameInterval $RunFrameMs
             $row = if ($script:walkDir -ge 0) { $RowRight } else { $RowLeft }
@@ -1106,11 +1266,22 @@ try {
             if ($script:idleTicks -ge $script:nextDecision) {
                 $script:idleTicks = 0
                 $roll = $script:random.Next(0, 100)
-                if ($roll -lt 55) { Start-Walk; return }
-                elseif ($roll -lt 72) { Start-OneShot $RowWave ($rowFrames[$RowWave] * 3) 'hello'; return }
-                elseif ($roll -lt 82) { Start-OneShot $RowJump ($rowFrames[$RowJump] * 3) 'jump'; return }
-                elseif ($roll -lt 88) { Start-OneShot $RowReview ($rowFrames[$RowReview] * 3) 'review'; return }
-                elseif ($roll -lt 93 -and $script:canEat) { Invoke-Eat; return }
+                if ($roll -lt 45) { Start-Walk; return }
+                elseif ($roll -lt 58) { Start-OneShot $RowWave ($rowFrames[$RowWave] * 3) 'hello'; return }
+                elseif ($roll -lt 66) { Start-OneShot $RowJump ($rowFrames[$RowJump] * 3) 'jump'; return }
+                elseif ($roll -lt 71) { Start-OneShot $RowReview ($rowFrames[$RowReview] * 3) 'review'; return }
+                elseif ($roll -lt 76) { Start-Emote 'nod'; return }
+                elseif ($roll -lt 80) { Start-Emote 'shake'; return }
+                elseif ($roll -lt 84) { Start-Emote 'cute'; return }
+                elseif ($roll -lt 87) { Start-Emote 'dance'; return }
+                elseif ($roll -lt 89) { Start-Emote 'stretch'; return }
+                elseif ($roll -lt 91) { Start-Emote 'spin'; return }
+                elseif ($roll -lt 92 -and $script:canEat) { Invoke-Eat; return }
+                elseif ($roll -lt 95) {
+                    # 偶尔冒一句可爱的话
+                    Show-Bubble ($script:cuteLines[$script:random.Next(0, $script:cuteLines.Count)]) 5000
+                    $script:nextDecision = $script:random.Next(14, 40)
+                }
                 else { $script:nextDecision = $script:random.Next(14, 40) }
             }
             if ($script:random.Next(0, 1000) -lt 4) { Play-Sound 'chirp' }
@@ -1145,6 +1316,7 @@ try {
     # ── 鼠标交互 ──
     $window.Add_MouseLeftButtonDown({
         $script:dragging = $true
+        if ($script:sleeping) { Wake-Up }
         $script:movedDuringDrag = $false
         $script:dragOrigin = [System.Windows.Forms.Cursor]::Position
         $script:windowOrigin = New-Object System.Windows.Point($window.Left, $window.Top)
@@ -1174,8 +1346,14 @@ try {
     $window.Add_MouseLeftButtonUp({
         $window.ReleaseMouseCapture()
         if ($script:dragging -and -not $script:movedDuringDrag) {
-            Start-OneShot $RowWave ($rowFrames[$RowWave] * 3) 'hello'
-            Say-Something ($lines[$script:random.Next(0, $lines.Count)])
+            if ($script:sleeping) {
+                Wake-Up
+            }
+            else {
+                Start-OneShot $RowWave ($rowFrames[$RowWave] * 3) 'hello'
+                if ($script:clickShowsStatus) { Show-PetStatus }
+                else { Say-Something ($lines[$script:random.Next(0, $lines.Count)]) }
+            }
         }
         else {
             $script:mode = 'idle'
@@ -1230,6 +1408,8 @@ try {
     Add-MenuItem 'AI 状态' { Show-Bubble (Get-AiStatusText) 6000 } | Out-Null
     Add-MenuItem '查看用量（tokens）' { Show-Bubble (Get-UsageText) 10000 } | Out-Null
     Add-MenuItem '查询余额' { Start-BalanceQuery } | Out-Null
+    Add-MenuItem '点击显示用量与余额' { $script:clickShowsStatus = $clickStatusItem.IsChecked } $true $script:clickShowsStatus | Out-Null
+    $clickStatusItem = $menu.Items[$menu.Items.Count - 1]
     Add-MenuItem '打开 AI 配置（记事本）' {
         try { Start-Process -FilePath 'notepad.exe' -ArgumentList $configPath } catch { }
         Show-Bubble '改完记得点「重新载入 AI 配置」' 6000
@@ -1238,6 +1418,14 @@ try {
         Reload-AiConfig
         Show-Bubble (Get-AiStatusText) 6000
     } | Out-Null
+    $menu.Items.Add((New-Object System.Windows.Controls.Separator)) | Out-Null
+    Add-MenuItem '点点头' { Start-Emote 'nod' } | Out-Null
+    Add-MenuItem '摇摇头' { Start-Emote 'shake' } | Out-Null
+    Add-MenuItem '转圈圈（然后晕）' { Start-Emote 'spin' } | Out-Null
+    Add-MenuItem '卖个萌' { Start-Emote 'cute' } | Out-Null
+    Add-MenuItem '跳支舞' { Start-Emote 'dance' } | Out-Null
+    Add-MenuItem '伸个懒腰' { Start-Emote 'stretch' } | Out-Null
+    Add-MenuItem '去睡觉（点她唤醒）' { Start-Sleep2 } | Out-Null
     $menu.Items.Add((New-Object System.Windows.Controls.Separator)) | Out-Null
     Add-MenuItem '偷吃快捷方式' { $script:canEat = $eatItem.IsChecked } $true $script:canEat | Out-Null
     $eatItem = $menu.Items[$menu.Items.Count - 1]
@@ -1277,7 +1465,20 @@ try {
         # 偷吃功能的自检：只验证函数可用与桌面可读，绝不真的移动文件
         $shortcutCount = (Get-DesktopShortcuts).Count
         $bellyCount = (Get-BellyItems).Count
-        "SELFTEST_OK atlas=$(Split-Path $atlasPath -Leaf) cell=${CellWidth}x${CellHeight} cards=$($cells.Length) sounds=$($players.Count) scale=$Scale walk_moved_px=$moved window=$($window.Width)x$($window.Height) ai=$($script:aiReady) bubble_ok=$([bool]$bubbleText) desktop_lnk=$shortcutCount belly=$bellyCount leftover_restored=$($script:leftoverRestored) usage='$((Get-UsageText))'"
+        # 表情编排自检：每种都排一遍，确认步数与用到的帧都在图集范围内
+        $emoteReport = @()
+        foreach ($name in @('nod', 'shake', 'spin', 'cute', 'dance', 'stretch')) {
+            Start-Emote $name
+            $bad = @($script:emoteQueue | Where-Object { $_.row -lt 0 -or $_.row -gt 10 -or $_.col -lt 0 -or $_.col -gt 7 })
+            $emoteReport += "$name=$($script:emoteQueue.Count)步$(if ($bad.Count -gt 0) { '(越界!)' } else { '' })"
+        }
+        $script:mode = 'idle'
+        Start-Sleep2
+        $sleepOk = $script:sleeping
+        Wake-Up
+        $wakeOk = -not $script:sleeping
+        $script:mode = 'idle'
+        "SELFTEST_OK atlas=$(Split-Path $atlasPath -Leaf) cell=${CellWidth}x${CellHeight} cards=$($cells.Length) sounds=$($players.Count) scale=$Scale walk_moved_px=$moved window=$($window.Width)x$($window.Height) ai=$($script:aiReady) bubble_ok=$([bool]$bubbleText) desktop_lnk=$shortcutCount belly=$bellyCount leftover_restored=$($script:leftoverRestored) usage='$(Get-UsageShort)' balance='$(Get-BalanceShort)' click_status=$($script:clickShowsStatus) emotes=[$($emoteReport -join ' ')] sleep_wake=$($sleepOk -and $wakeOk)"
         exit 0
     }
 
