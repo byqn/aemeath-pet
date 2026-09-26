@@ -22,6 +22,7 @@
 ## 目录
 
 ```
+build_aemeath_pet.ps1     端到端编排：生成 → 组装 → QA → 打包（不自动批准审核）
 run_imagegen_job.ps1      单任务 CLI 执行器（含脱敏失败诊断）
 run_imagegen_secure.ps1   本机隐藏提示输入密钥，用完即清
 dryrun_imagegen_plan.ps1  13 项 payload 离线校验
@@ -44,8 +45,16 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 离线校验（不联网）：
 
 ```powershell
+.\build_aemeath_pet.ps1 -PlanOnly        # 只看依赖顺序与各任务状态
+.\build_aemeath_pet.ps1 -DryRun          # 演练，不调用任何 API
 .\run_imagegen_job.ps1 -JobId base -DryRun
 python .\validate_project_setup.py
+```
+
+审核（必须由人目视后执行，不会自动通过）：
+
+```powershell
+.\approve_imagegen_job.ps1 -JobId base -DecisionNote "<至少12字的目视依据>" -ConfirmVisualReview
 ```
 
 ## 仓库说明
