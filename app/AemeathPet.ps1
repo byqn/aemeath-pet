@@ -342,17 +342,60 @@ try {
         return "$($p._id) / $($p.display_name) / $($p.protocol) / $($p.model)"
     }
 
+    function New-AiHttpClient {
+        # 按当前提供方的代理设置构建客户端；留空表示跟随系统代理
+        $handler = New-Object System.Net.Http.HttpClientHandler
+        $proxyUrl = ''
+        if ($script:aiProvider -and $script:aiProvider.PSObject.Properties['proxy']) { $proxyUrl = [string]$script:aiProvider.proxy }
+        if ([string]::IsNullOrWhiteSpace($proxyUrl) -and $script:aiConfig -and $script:aiConfig.PSObject.Properties['proxy']) {
+            $proxyUrl = [string]$script:aiConfig.proxy
+        }
+        if (-not [string]::IsNullOrWhiteSpace($proxyUrl)) {
+            $handler.UseProxy = $true
+            $handler.Proxy = New-Object System.Net.WebProxy($proxyUrl.Trim(), $true)
+        }
+        $client = New-Object System.Net.Http.HttpClient($handler)
+        $timeout = 30
+        if ($script:aiConfig -and $script:aiConfig.timeout_seconds) { $timeout = [int]$script:aiConfig.timeout_seconds }
+        $client.Timeout = [TimeSpan]::FromSeconds($timeout)
+        return $client
+    }
+
+    function Get-AiErrorHint([int]$Status, [string]$RawMessage) {
+        switch ($Status) {
+            401 { return '密钥无效或没填' }
+            403 { return '密钥没权限，或余额不足' }
+            404 { return '地址不对：要填到 /v1 这一层' }
+            405 { return '地址不对：接口不支持这个路径' }
+            429 { return '触发频率或额度限制' }
+            default {
+                if ($RawMessage -match '(?i)timed?\s*out|超时') { return '连接超时，可能需要填代理' }
+                if ($RawMessage -match '(?i)name resolution|无法解析|no such host') { return '域名解析失败，检查地址拼写' }
+                if ($RawMessage -match '(?i)connect|refused|unreachable') { return '连不上，可能需要填代理' }
+                return $RawMessage
+            }
+        }
+    }
+
     function Invoke-ModelsFetch([string]$BaseUrl, [string]$ApiKey, [string]$Protocol) {
         # 拉取可用模型列表；返回 @{ ok=...; models=@(); message=... }
         $result = @{ ok = $false; models = @(); message = '' }
         $url = $BaseUrl.TrimEnd('/')
-        if ($Protocol -eq 'openai-responses') { $endpoint = "$url/models" } else { $endpoint = "$url/models" }
+        if ([string]::IsNullOrWhiteSpace($ApiKey)) {
+            $result.message = '还没填 API 密钥（本地服务也要随便填几个字符）'
+            return $result
+        }
+        $endpoint = "$url/models"
         try {
             $headers = @{ Authorization = "Bearer $ApiKey" }
-            $response = Invoke-RestMethod -Uri $endpoint -Headers $headers -Method Get -TimeoutSec 15
+            $proxyUrl = ''
+            if ($script:aiProvider -and $script:aiProvider.PSObject.Properties['proxy']) { $proxyUrl = [string]$script:aiProvider.proxy }
+            $params = @{ Uri = $endpoint; Headers = $headers; Method = 'Get'; TimeoutSec = 15 }
+            if (-not [string]::IsNullOrWhiteSpace($proxyUrl)) { $params['Proxy'] = $proxyUrl.Trim() }
+            $response = Invoke-RestMethod @params
             $ids = @($response.data | ForEach-Object { $_.id } | Where-Object { $_ }) | Sort-Object -Unique
             if ($ids.Count -eq 0) {
-                $result.message = '接口返回里没有模型列表'
+                $result.message = '接口有响应，但返回里没有模型列表（格式不是 OpenAI 的 data[] 结构）'
                 return $result
             }
             $result.ok = $true
@@ -360,9 +403,10 @@ try {
             return $result
         }
         catch {
-            $status = ''
+            $status = 0
             try { $status = [int]$_.Exception.Response.StatusCode } catch { }
-            $result.message = if ($status) { "HTTP $status" } else { $_.Exception.Message }
+            $raw = $_.Exception.Message
+            $result.message = if ($status) { "HTTP $status — $(Get-AiErrorHint $status $raw)" } else { Get-AiErrorHint 0 $raw }
             return $result
         }
     }
@@ -434,6 +478,9 @@ try {
         $keyPlain.Visibility = [System.Windows.Visibility]::Collapsed
         $panel.Children.Add($keyPlain) | Out-Null
 
+        $proxyBox = New-Object System.Windows.Controls.TextBox
+        Add-Field '代理（可选）' '访问国外接口连不上时填，例如 http://127.0.0.1:7892；留空表示跟随系统代理' $proxyBox
+
         # 模型目录
         $modelRow = New-Object System.Windows.Controls.DockPanel
         $fetchBtn = New-Object System.Windows.Controls.Button
@@ -481,6 +528,7 @@ try {
             if ($p.protocol) { $protocolCombo.SelectedItem = [string]$p.protocol }
             $keyBox.Password = [string]$p.api_key
             $keyPlain.Text = [string]$p.api_key
+            $proxyBox.Text = if ($p.PSObject.Properties['proxy']) { [string]$p.proxy } else { '' }
             $modelCombo.Text = [string]$p.model
             $modelCombo.Items.Clear()
             foreach ($m in @($p.models)) { [void]$modelCombo.Items.Add($m) }
@@ -507,18 +555,27 @@ try {
             $url = $urlBox.Text.Trim()
             $key = if ($keyBox.Visibility -eq [System.Windows.Visibility]::Visible) { $keyBox.Password } else { $keyPlain.Text }
             if ([string]::IsNullOrWhiteSpace($url)) { $statusText.Text = '先填 API 地址'; return }
+            if ([string]::IsNullOrWhiteSpace($key)) { $statusText.Text = '先填 API 密钥——没密钥的请求会被服务商拒绝（401）'; return }
             $statusText.Text = '正在拉取模型列表…'
             $dlg.Cursor = [System.Windows.Input.Cursors]::Wait
             try {
-                $r = Invoke-ModelsFetch $url $key ([string]$protocolCombo.SelectedItem)
+                # 让拉取也用上当前面板里填的代理，而不是等保存之后
+                $savedProvider = $script:aiProvider
+                $script:aiProvider = [pscustomobject]@{ base_url = $url; api_key = $key; proxy = $proxyBox.Text.Trim() }
+                try {
+                    $r = Invoke-ModelsFetch $url $key ([string]$protocolCombo.SelectedItem)
+                }
+                finally { $script:aiProvider = $savedProvider }
                 if ($r.ok) {
                     $modelCombo.Items.Clear()
                     foreach ($m in $r.models) { [void]$modelCombo.Items.Add($m) }
                     if ([string]::IsNullOrWhiteSpace($modelCombo.Text) -and $r.models.Count -gt 0) { $modelCombo.Text = $r.models[0] }
                     $statusText.Text = "拉到 $($r.models.Count) 个模型，从下拉里挑一个"
+                    Write-Log "models fetched from $url : $($r.models.Count)"
                 }
                 else {
-                    $statusText.Text = "拉取失败：$($r.message)（可以直接手输模型名）"
+                    $statusText.Text = "拉取失败：$($r.message)"
+                    Write-Log "models fetch failed from $url : $($r.message)"
                 }
             }
             finally { $dlg.Cursor = [System.Windows.Input.Cursors]::Arrow }
@@ -549,6 +606,7 @@ try {
                 api_key      = $key
                 model        = $model
                 models       = $models
+                proxy        = $proxyBox.Text.Trim()
             }
             $cfg.providers | Add-Member -NotePropertyName $id -NotePropertyValue ($entry | ConvertTo-Json -Depth 6 | ConvertFrom-Json) -Force
             $cfg.active_provider = $id
@@ -622,6 +680,7 @@ try {
         $script:httpTask = $null
         $script:balanceTried = @()
         try {
+            $script:http = New-AiHttpClient
             $script:http.Timeout = [TimeSpan]::FromSeconds(15)
             $script:http.DefaultRequestHeaders.Authorization =
                 New-Object System.Net.Http.Headers.AuthenticationHeaderValue('Bearer', $script:aiProvider.api_key)
@@ -712,7 +771,7 @@ try {
         } | ConvertTo-Json -Depth 6
 
         try {
-            $script:http.Timeout = [TimeSpan]::FromSeconds([int]$script:aiConfig.timeout_seconds)
+            $script:http = New-AiHttpClient
             $script:http.DefaultRequestHeaders.Authorization =
                 New-Object System.Net.Http.Headers.AuthenticationHeaderValue('Bearer', $script:aiProvider.api_key)
             $content = New-Object System.Net.Http.StringContent($body, [System.Text.Encoding]::UTF8, 'application/json')
@@ -1269,6 +1328,7 @@ try {
             "    base_url = $($script:aiProvider.base_url)"
             "    model = $($script:aiProvider.model)"
             "    api_key = $(if ([string]::IsNullOrWhiteSpace($script:aiProvider.api_key)) { '(空)' } else { '已填写（长度 ' + $script:aiProvider.api_key.Length + '）' })"
+            "    proxy = $(if ($script:aiProvider.PSObject.Properties['proxy'] -and -not [string]::IsNullOrWhiteSpace($script:aiProvider.proxy)) { $script:aiProvider.proxy } else { '(跟随系统)' })"
         }
         "  余额端点（按服务商推断，失败会自动依次重试）= $(Get-BalanceEndpoints -join '  ->  ')"
         if (-not $script:aiReady) { "SKIPPED 未启用或未选提供方或未填密钥；右键 → API 设置"; exit 2 }
@@ -1278,8 +1338,7 @@ try {
         )
         $body = @{ model = $script:aiProvider.model; messages = $messages; max_tokens = [int]$script:aiConfig.max_tokens } | ConvertTo-Json -Depth 6
         try {
-            $testClient = New-Object System.Net.Http.HttpClient
-            $testClient.Timeout = [TimeSpan]::FromSeconds([int]$script:aiConfig.timeout_seconds)
+            $testClient = New-AiHttpClient
             $testClient.DefaultRequestHeaders.Authorization =
                 New-Object System.Net.Http.Headers.AuthenticationHeaderValue('Bearer', $script:aiProvider.api_key)
             $content = New-Object System.Net.Http.StringContent($body, [System.Text.Encoding]::UTF8, 'application/json')
