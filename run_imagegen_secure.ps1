@@ -11,6 +11,9 @@ param(
     # 可选：OpenAI 兼容的自定义端点（例如中转站）。地址不是密钥，可以直接作为参数传入。
     [string]$BaseUrl,
 
+    # 可选：图像模型名，默认 gpt-image-2。
+    [string]$Model = "gpt-image-2",
+
     [switch]$DryRun,
     [switch]$Force
 )
@@ -33,7 +36,7 @@ elseif (-not [string]::IsNullOrWhiteSpace($env:OPENAI_BASE_URL)) {
     throw "检测到自定义 OPENAI_BASE_URL；如确实要使用该端点，请用 -BaseUrl 显式指定，避免误发到未知中转。"
 }
 
-$runnerArgs = @{ JobId = $JobId; Force = $Force }
+$runnerArgs = @{ JobId = $JobId; Force = $Force; Model = $Model }
 if ($DryRun) { $runnerArgs["DryRun"] = $true }
 if ($useRelay) { $runnerArgs["AllowCustomEndpoint"] = $true }
 

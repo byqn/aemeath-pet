@@ -4,11 +4,18 @@ param(
     [switch]$DryRun,
     [switch]$SkipPackage,
 
+    # 可选：OpenAI 兼容的自定义端点（中转）。地址不是密钥，可直接传参。
+    [string]$BaseUrl,
+
+    # 图像模型名，默认 gpt-image-2。
+    [string]$Model = "gpt-image-2",
+
     [string]$Python = $(if ($env:DSH_PYTHON) { $env:DSH_PYTHON } else { "C:\Users\32022\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe" })
 )
 
 # 爱弥斯 v2 桌宠端到端编排：生成 -> 组装标准行 -> v2 QA -> 打包。
-# 刻意不做的事：不自动批准任务、不读取或写入任何凭据、不在缺少素材时伪造产物。
+# 刻意不做的事：不自动批准任务、不把密钥写入任何文件、不在缺少素材时伪造产物。
+# 密钥只在本次进程内存里存活，整条链跑完立即清除。
 # 退出码：0 = 请求的阶段已全部走完（或仅计划/演练）；3 = 仍在等待素材或人工审核；1 = 出错。
 
 $ErrorActionPreference = "Stop"
@@ -94,6 +101,38 @@ if ($PlanOnly) {
     exit 0
 }
 
+# ── 中转与密钥：整条链只输一次，密钥只存在于本进程内存，结束即清 ──
+$useRelay = -not [string]::IsNullOrWhiteSpace($BaseUrl)
+$previousBaseUrl = $env:OPENAI_BASE_URL
+$keySetHere = $false
+$secureKey = $null
+$keyPointer = [IntPtr]::Zero
+$keyPlain = $null
+$relayHost = ""
+
+if ($useRelay) {
+    $parsedUri = $null
+    if (-not [System.Uri]::TryCreate($BaseUrl, [System.UriKind]::Absolute, [ref]$parsedUri)) { throw "BaseUrl 不是合法地址：$BaseUrl" }
+    if ($parsedUri.Scheme -ne "https") { throw "拒绝非 https 端点：$($parsedUri.Scheme)" }
+    $relayHost = $parsedUri.Host
+    Write-Warning "使用自定义端点：$relayHost；提示词与密钥都会经过该第三方服务。"
+}
+
+try {
+    if ($useRelay) { $env:OPENAI_BASE_URL = $BaseUrl }
+
+    if (-not $DryRun -and [string]::IsNullOrWhiteSpace($env:OPENAI_API_KEY)) {
+        $promptText = if ($useRelay) { "API key（$relayHost 签发；整条链只输一次，输入隐藏，不写入任何文件）" } else { "OpenAI API key（整条链只输一次，输入隐藏）" }
+        $secureKey = Read-Host -Prompt $promptText -AsSecureString
+        if ($null -eq $secureKey -or $secureKey.Length -lt 12) { throw "输入为空或长度异常；未发起任何请求。" }
+        $keyPointer = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureKey)
+        $keyPlain = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($keyPointer)
+        if ([string]::IsNullOrWhiteSpace($keyPlain)) { throw "密钥读取为空；未发起任何请求。" }
+        $env:OPENAI_API_KEY = $keyPlain
+        $keySetHere = $true
+        Write-Host "密钥已载入本进程内存；整条链结束后自动清除。" -ForegroundColor DarkGray
+    }
+
 # ── 阶段 1：生成（逐项依赖推进，遇到失败立即停下）──
 Write-Host ""
 Write-Host "=== 阶段 1：视觉素材生成 ===" -ForegroundColor Cyan
@@ -114,8 +153,9 @@ while ($true) {
         else {
             Write-Host "-> 生成 $($job.id)" -ForegroundColor Green
         }
-        $jobArgs = @{ JobId = $job.id; Python = $Python }
+        $jobArgs = @{ JobId = $job.id; Python = $Python; Model = $Model }
         if ($DryRun) { $jobArgs["DryRun"] = $true }
+        if ($useRelay) { $jobArgs["AllowCustomEndpoint"] = $true }
         & $JobScript @jobArgs
         if (-not $DryRun) { $generatedThisRun += $job.id }
     }
@@ -192,3 +232,16 @@ if ($buildComplete) {
 }
 Write-Host "流程尚未走完：等待素材生成与逐项目视审核。" -ForegroundColor Yellow
 exit 3
+}
+finally {
+    # 只清除本次自己设置的内容，绝不动用户原有的环境变量。
+    if ($keySetHere) { Remove-Item Env:OPENAI_API_KEY -ErrorAction SilentlyContinue }
+    if ($useRelay) {
+        if ([string]::IsNullOrWhiteSpace($previousBaseUrl)) { Remove-Item Env:OPENAI_BASE_URL -ErrorAction SilentlyContinue }
+        else { $env:OPENAI_BASE_URL = $previousBaseUrl }
+    }
+    if ($keyPointer -ne [IntPtr]::Zero) { [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($keyPointer) }
+    if ($null -ne $secureKey) { $secureKey.Dispose() }
+    $keyPlain = $null
+    if ($keySetHere) { Write-Host "密钥已从本进程清除。" -ForegroundColor DarkGray }
+}

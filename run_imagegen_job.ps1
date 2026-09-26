@@ -12,10 +12,14 @@ param(
     [switch]$Force,
     [switch]$AllowCustomEndpoint,
 
+    # 图像模型名，必须保持 gpt-image-* 前缀。默认沿用 gpt-image-2。
+    [string]$Model = "gpt-image-2",
+
     [string]$Python = $(if ($env:DSH_PYTHON) { $env:DSH_PYTHON } else { "C:\Users\32022\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe" })
 )
 
 $ErrorActionPreference = "Stop"
+if ($Model -notlike "gpt-image-*") { throw "模型名必须以 gpt-image- 开头：$Model" }
 $RunDir = Join-Path $PSScriptRoot "work\aemeath-run"
 $ManifestPath = Join-Path $RunDir "imagegen-jobs.json"
 $CliPath = Join-Path $(if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USERPROFILE ".codex" }) "skills\.system\imagegen\scripts\image_gen.py"
@@ -149,7 +153,7 @@ $cliMode = if ($job.kind -eq "base-pet") { "generate" } else { "edit" }
 $size = if ($job.kind -eq "base-pet") { "1024x1536" } else { "1536x512" }
 $arguments = @(
     $cliMode,
-    "--model", "gpt-image-2",
+    "--model", $Model,
     "--prompt-file", $effectivePromptPath,
     "--size", $size,
     "--quality", "high",
