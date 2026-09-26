@@ -1,0 +1,72 @@
+{
+  "_说明": "这是示例文件，不是程序读取的文件。程序读的是 ai-config.json。挑一个你想用的服务商，把它的字段抄进 ai-config.json，并填上你自己的密钥。",
+
+  "_请求长什么样": "程序对 base_url + '/chat/completions' 发一个 HTTPS POST，带 Authorization: Bearer <你的密钥>，body 是 {model, messages, max_tokens}，回复取 choices[0].message.content。任何 OpenAI 兼容接口都认这套。",
+
+  "示例1_OpenAI官方": {
+    "enabled": true,
+    "base_url": "https://api.openai.com/v1",
+    "api_key": "在这里填 sk- 开头的密钥",
+    "model": "gpt-4o-mini",
+    "max_tokens": 120,
+    "timeout_seconds": 30,
+    "system_prompt": "你是《鸣潮》爱弥斯风格的桌面宠物，Q版、粉发、金色星形瞳孔。说话简短可爱、口语化，一般不超过 30 个字，不要用 markdown，不要自称 AI 或语言模型。"
+  },
+
+  "示例2_DeepSeek": {
+    "enabled": true,
+    "base_url": "https://api.deepseek.com/v1",
+    "api_key": "在这里填 DeepSeek 的密钥",
+    "model": "deepseek-chat",
+    "max_tokens": 120,
+    "timeout_seconds": 30,
+    "system_prompt": "你是《鸣潮》爱弥斯风格的桌面宠物，Q版、粉发、金色星形瞳孔。说话简短可爱、口语化，一般不超过 30 个字，不要用 markdown，不要自称 AI 或语言模型。"
+  },
+
+  "示例3_硅基流动": {
+    "enabled": true,
+    "base_url": "https://api.siliconflow.cn/v1",
+    "api_key": "在这里填硅基流动的密钥",
+    "model": "Qwen/Qwen2.5-7B-Instruct",
+    "max_tokens": 120,
+    "timeout_seconds": 30,
+    "system_prompt": "你是《鸣潮》爱弥斯风格的桌面宠物，Q版、粉发、金色星形瞳孔。说话简短可爱、口语化，一般不超过 30 个字，不要用 markdown，不要自称 AI 或语言模型。"
+  },
+
+  "示例4_本地Ollama": {
+    "_注意": "本地部署不需要真的密钥，但不能留空，随便填几个字符即可。",
+    "enabled": true,
+    "base_url": "http://localhost:11434/v1",
+    "api_key": "ollama",
+    "model": "qwen2.5",
+    "max_tokens": 120,
+    "timeout_seconds": 60,
+    "system_prompt": "你是《鸣潮》爱弥斯风格的桌面宠物，Q版、粉发、金色星形瞳孔。说话简短可爱、口语化，一般不超过 30 个字，不要用 markdown，不要自称 AI 或语言模型。"
+  },
+
+  "示例5_本地LMStudio": {
+    "enabled": true,
+    "base_url": "http://localhost:1234/v1",
+    "api_key": "lmstudio",
+    "model": "本地加载的模型名",
+    "max_tokens": 120,
+    "timeout_seconds": 60,
+    "system_prompt": "你是《鸣潮》爱弥斯风格的桌面宠物，Q版、粉发、金色星形瞳孔。说话简短可爱、口语化，一般不超过 30 个字，不要用 markdown，不要自称 AI 或语言模型。"
+  },
+
+  "_不推荐_code0中转": "之前探测过 code0.ai 的 /v1/models，只返回 6 个图像模型（gpt-image-2 系列），没有对话模型。它也许有单独的对话接口，但至少那个 key 在 chat/completions 上不可用。",
+
+  "_排错对照": {
+    "401": "密钥无效或已失效",
+    "403": "密钥没权限 / 余额不足",
+    "404": "base_url 或 model 名字不对",
+    "429": "触发频率或额度限制",
+    "连不上": "base_url 写错、网络不通、或本地服务没启动"
+  },
+
+  "_怎么验证": [
+    "方法一（不用开界面）：powershell -NoProfile -STA -ExecutionPolicy Bypass -File AemeathPet.ps1 -TestAi",
+    "方法二（界面里）：右键她 → 测试 AI 连接",
+    "方法三（改完不想重启）：右键她 → 重新载入 AI 配置，再测"
+  ]
+}

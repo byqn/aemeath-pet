@@ -29,6 +29,8 @@ try_planb_key.py
 app/ai-config.json
 app/*.backup.json
 app/aemeath-pet.log
+# 偷吃功能暂存桌面快捷方式的目录（里面是用户的文件）
+app/belly/
 
 # ── 可由脚本重建的大体积派生文件 ──
 work/aemeath-run/frames/

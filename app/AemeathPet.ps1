@@ -118,6 +118,120 @@ try {
         try { $synth.SpeakAsync($Text) | Out-Null } catch { }
     }
 
+    # ── 偷吃桌面快捷方式 ──
+    # 安全设计：
+    #  * 默认只做动画和气泡，完全不碰文件
+    #  * “真吃”必须由用户在菜单里显式打开，且只移动桌面顶层目录里的 *.lnk
+    #  * 每次移动都记录原始路径，退出时、下次启动时、以及菜单里都能还原
+    #  * 绝不删除任何文件；目标重名时改名而不是覆盖
+    $script:canEat = $false
+    $script:eatRealMode = $false
+    $script:bellyDir = Join-Path $scriptRoot 'belly'
+    $script:bellyRecord = Join-Path $script:bellyDir 'belly.json'
+    $script:desktopDir = [Environment]::GetFolderPath('Desktop')
+
+    function Get-BellyItems {
+        if (-not (Test-Path -LiteralPath $script:bellyRecord -PathType Leaf)) { return @() }
+        try { return @(Get-Content -LiteralPath $script:bellyRecord -Raw -Encoding UTF8 | ConvertFrom-Json) }
+        catch { Write-Log "belly.json 解析失败：$($_.Exception.Message)"; return @() }
+    }
+
+    function Save-BellyItems([object[]]$Items) {
+        New-Item -ItemType Directory -Force -Path $script:bellyDir | Out-Null
+        if ($Items.Count -eq 0) {
+            if (Test-Path -LiteralPath $script:bellyRecord) { Remove-Item -LiteralPath $script:bellyRecord -Force }
+            return
+        }
+        $Items | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $script:bellyRecord -Encoding UTF8
+    }
+
+    function Get-DesktopShortcuts {
+        if ([string]::IsNullOrWhiteSpace($script:desktopDir)) { return @() }
+        if (-not (Test-Path -LiteralPath $script:desktopDir -PathType Container)) { return @() }
+        # 只认桌面顶层目录里的 .lnk，不递归、不碰文件夹和其他类型
+        return @(Get-ChildItem -LiteralPath $script:desktopDir -File -Filter '*.lnk' -ErrorAction SilentlyContinue)
+    }
+
+    function Restore-Belly([switch]$Quiet) {
+        $items = Get-BellyItems
+        if ($items.Count -eq 0) {
+            if (-not $Quiet) { Show-Bubble '她肚子里什么都没有' 4000 }
+            return 0
+        }
+        $restored = 0
+        $left = New-Object System.Collections.ArrayList
+        foreach ($item in $items) {
+            $stored = Join-Path $script:bellyDir $item.stored
+            if (-not (Test-Path -LiteralPath $stored -PathType Leaf)) { continue }
+            $target = $item.original
+            if (Test-Path -LiteralPath $target) {
+                # 原位已被占用，改名放回，绝不覆盖
+                $dir = Split-Path -Parent $target
+                $base = [IO.Path]::GetFileNameWithoutExtension($target)
+                $ext = [IO.Path]::GetExtension($target)
+                $target = Join-Path $dir ("$base (恢复)$ext")
+            }
+            try {
+                Move-Item -LiteralPath $stored -Destination $target -Force
+                $restored++
+                Write-Log "restored: $target"
+            }
+            catch {
+                Write-Log "restore failed: $target $($_.Exception.Message)"
+                [void]$left.Add($item)
+            }
+        }
+        Save-BellyItems $left.ToArray()
+        if (-not $Quiet) { Show-Bubble "吐出来了 $restored 个" 5000 }
+        return $restored
+    }
+
+    function Invoke-Eat {
+        $shortcuts = Get-DesktopShortcuts
+        if ($shortcuts.Count -eq 0) {
+            Show-Bubble '桌上没有快捷方式可以吃…' 4000
+            return
+        }
+        $pick = $shortcuts[$script:random.Next(0, $shortcuts.Count)]
+        $name = [IO.Path]::GetFileNameWithoutExtension($pick.Name)
+        if ($script:eatRealMode) {
+            New-Item -ItemType Directory -Force -Path $script:bellyDir | Out-Null
+            $stored = $pick.Name
+            $counter = 1
+            while (Test-Path -LiteralPath (Join-Path $script:bellyDir $stored)) {
+                $stored = [IO.Path]::GetFileNameWithoutExtension($pick.Name) + "-$counter.lnk"
+                $counter++
+            }
+            try {
+                Move-Item -LiteralPath $pick.FullName -Destination (Join-Path $script:bellyDir $stored) -Force
+                $items = New-Object System.Collections.ArrayList
+                foreach ($existing in Get-BellyItems) { [void]$items.Add($existing) }
+                [void]$items.Add([ordered]@{
+                    name     = $name
+                    original = $pick.FullName
+                    stored   = $stored
+                    eaten_at = (Get-Date).ToString('s')
+                })
+                Save-BellyItems $items.ToArray()
+                Write-Log "ate: $($pick.FullName) -> $stored"
+                Show-Bubble "嗯…「$name」被我吃掉了~（退出时会还给你）" 6000
+            }
+            catch {
+                Write-Log "eat failed: $($_.Exception.Message)"
+                Show-Bubble "咬不动「$name」…" 4000
+                return
+            }
+        }
+        else {
+            Show-Bubble "嗯…「$name」看起来很好吃~（只是假装）" 5000
+        }
+        Play-Sound 'eat'
+        Start-OneShot $RowWork ($rowFrames[$RowWork] * 3) $null
+    }
+
+    # 启动时先把上次没还回去的还掉，避免程序被强杀后东西一直留在肚子里
+    $script:leftoverRestored = Restore-Belly -Quiet
+
     # ── AI 对话（任何 OpenAI 兼容接口）──
     # 密钥只放在本机 ai-config.json 里，程序不打印、不外传。
     $configPath = Join-Path $scriptRoot 'ai-config.json'
@@ -156,8 +270,106 @@ try {
     catch { }
     $script:http = New-Object System.Net.Http.HttpClient
     $script:httpTask = $null
+    $script:httpTaskKind = 'chat'
+    $script:httpTaskQueue = @()
+    $script:balanceTried = @()
     $script:httpBusy = $false
     $script:history = New-Object System.Collections.ArrayList
+
+    # ── 用量统计：每次回复里的 usage 累加 ──
+    $script:usage = [ordered]@{ calls = 0; prompt = 0; completion = 0; total = 0; last = $null }
+    function Get-UsageText {
+        if ($script:usage.calls -eq 0) { return '本次会话还没调用过' }
+        $u = $script:usage
+        $lastText = ''
+        if ($null -ne $u.last) {
+            $lastText = "  上次：入 $($u.last.prompt) / 出 $($u.last.completion)"
+        }
+        return "调用 $($u.calls) 次；输入 $($u.prompt) tokens，输出 $($u.completion) tokens，合计 $($u.total)$lastText"
+    }
+
+    # ── 余额查询：不同服务商接口不同，按 base_url 猜，猜不到就依次试 ──
+    function Get-BalanceEndpoints {
+        $base = $script:aiConfig.base_url.TrimEnd('/')
+        $host_ = ''
+        try { $host_ = ([Uri]$base).Host.ToLower() } catch { }
+        if ($host_ -like '*deepseek*') { return @("$base/user/balance") }
+        if ($host_ -like '*siliconflow*') { return @("$base/user/info") }
+        if ($host_ -like '*moonshot*') { return @("$base/users/me/balance") }
+        if ($host_ -like '*openai*') {
+            # OpenAI 的 API key 没有公开的余额接口，如实说明而不是瞎猜
+            return @("$base/dashboard/billing/credit_grants")
+        }
+        return @("$base/user/balance", "$base/dashboard/billing/credit_grants", "$base/user/info")
+    }
+
+    function Start-BalanceQuery {
+        if (-not $script:aiReady) { Show-Bubble (Get-AiStatusText) 6000; return }
+        if ($script:httpBusy) { return }
+        $script:httpBusy = $true
+        $script:httpTask = $null
+        $script:balanceTried = @()
+        try {
+            $script:http.Timeout = [TimeSpan]::FromSeconds(15)
+            $script:http.DefaultRequestHeaders.Authorization =
+                New-Object System.Net.Http.Headers.AuthenticationHeaderValue('Bearer', $script:aiConfig.api_key)
+            $endpoints = Get-BalanceEndpoints
+            $script:balanceTried = $endpoints
+            $script:httpTask = $script:http.GetAsync($endpoints[0])
+            $script:httpTaskKind = 'balance'
+            $script:httpTaskQueue = @($endpoints | Select-Object -Skip 1)
+            Show-Bubble '查询余额…' 20000
+        }
+        catch {
+            $script:httpBusy = $false
+            Show-Bubble "查询失败：$($_.Exception.Message)" 8000
+        }
+    }
+
+    function Complete-BalanceQuery {
+        $task = $script:httpTask
+        $script:httpTask = $null
+        try {
+            $response = $task.Result
+            $text = $response.Content.ReadAsStringAsync().Result
+            if (-not $response.IsSuccessStatusCode) {
+                # 这个端点不认，换下一个试
+                if ($script:httpTaskQueue.Count -gt 0) {
+                    $next = $script:httpTaskQueue[0]
+                    $script:httpTaskQueue = @($script:httpTaskQueue | Select-Object -Skip 1)
+                    $script:httpTask = $script:http.GetAsync($next)
+                    return
+                }
+                $script:httpBusy = $false
+                Show-Bubble "该接口没有可用的余额端点（已试 $($script:balanceTried.Count) 个）" 8000
+                Write-Log "balance failed: $($script:balanceTried -join ', ')"
+                return
+            }
+            $script:httpBusy = $false
+            $parsed = $text | ConvertFrom-Json
+            $summary = $null
+            # DeepSeek：balance_infos[].total_balance
+            if ($parsed.balance_infos) {
+                $summary = ($parsed.balance_infos | ForEach-Object { "$($_.total_balance) $($_.currency)" }) -join ' / '
+            }
+            elseif ($parsed.data -and $parsed.data.balance) { $summary = "$($parsed.data.balance)" }
+            elseif ($parsed.balance) { $summary = "$($parsed.balance)" }
+            elseif ($parsed.total_available) { $summary = "$($parsed.total_available)" }
+            if ([string]::IsNullOrWhiteSpace($summary)) {
+                $preview = $text.Substring(0, [Math]::Min(160, $text.Length))
+                Show-Bubble "余额：$preview" 12000
+            }
+            else {
+                Show-Bubble "余额：$summary" 12000
+            }
+            Write-Log "balance ok: $text"
+        }
+        catch {
+            $script:httpBusy = $false
+            Show-Bubble '余额解析失败' 8000
+            Write-Log "balance parse failed: $($_.Exception.Message)"
+        }
+    }
 
     function Get-AiStatusText() {
         if ($null -eq $script:aiConfig) { return 'AI：配置文件损坏' }
@@ -194,6 +406,7 @@ try {
             $url = $script:aiConfig.base_url.TrimEnd('/') + '/chat/completions'
             # 异步发出，交给主循环轮询；同步调用会把界面卡死
             $script:httpTask = $script:http.PostAsync($url, $content)
+            $script:httpTaskKind = 'chat'
             Show-Bubble '……' 30000
         }
         catch {
@@ -225,6 +438,17 @@ try {
             }
             $parsed = $text | ConvertFrom-Json
             $reply = $parsed.choices[0].message.content
+            # 统计用量：OpenAI 兼容接口都会在 usage 里返回 token 数
+            if ($parsed.usage) {
+                $p = [int]$parsed.usage.prompt_tokens
+                $c = [int]$parsed.usage.completion_tokens
+                $t = if ($parsed.usage.total_tokens) { [int]$parsed.usage.total_tokens } else { $p + $c }
+                $script:usage.calls++
+                $script:usage.prompt += $p
+                $script:usage.completion += $c
+                $script:usage.total += $t
+                $script:usage.last = [ordered]@{ prompt = $p; completion = $c; total = $t }
+            }
             if ([string]::IsNullOrWhiteSpace($reply)) { $reply = '（她没说话）' }
             $reply = $reply.Trim()
             [void]$script:history.Add(@{ role = 'user'; content = $script:lastUserText })
@@ -452,8 +676,10 @@ try {
     function Update-Frame() {
         $script:frameTick++
 
-        # AI 请求轮询 + 气泡自动收起（放在最前面，任何状态下都要生效）
-        Complete-AiRequest
+        # AI 请求 / 余额查询轮询 + 气泡自动收起（放在最前面，任何状态下都要生效）
+        if ($null -ne $script:httpTask -and $script:httpTask.IsCompleted) {
+            if ($script:httpTaskKind -eq 'balance') { Complete-BalanceQuery } else { Complete-AiRequest }
+        }
         if ($script:bubbleUntil -gt 0 -and [Environment]::TickCount -gt $script:bubbleUntil) {
             $script:bubbleUntil = 0
             if ($bubble.IsVisible) { $bubble.Hide() }
@@ -512,6 +738,7 @@ try {
                 elseif ($roll -lt 72) { Start-OneShot $RowWave ($rowFrames[$RowWave] * 3) 'hello'; return }
                 elseif ($roll -lt 82) { Start-OneShot $RowJump ($rowFrames[$RowJump] * 3) 'jump'; return }
                 elseif ($roll -lt 88) { Start-OneShot $RowReview ($rowFrames[$RowReview] * 3) 'review'; return }
+                elseif ($roll -lt 93 -and $script:canEat) { Invoke-Eat; return }
                 else { $script:nextDecision = $script:random.Next(14, 40) }
             }
             if ($script:random.Next(0, 1000) -lt 4) { Play-Sound 'chirp' }
@@ -628,6 +855,8 @@ try {
         }
     } | Out-Null
     Add-MenuItem 'AI 状态' { Show-Bubble (Get-AiStatusText) 6000 } | Out-Null
+    Add-MenuItem '查看用量（tokens）' { Show-Bubble (Get-UsageText) 10000 } | Out-Null
+    Add-MenuItem '查询余额' { Start-BalanceQuery } | Out-Null
     Add-MenuItem '打开 AI 配置（记事本）' {
         try { Start-Process -FilePath 'notepad.exe' -ArgumentList $configPath } catch { }
         Show-Bubble '改完记得点「重新载入 AI 配置」' 6000
@@ -636,6 +865,22 @@ try {
         Reload-AiConfig
         Show-Bubble (Get-AiStatusText) 6000
     } | Out-Null
+    $menu.Items.Add((New-Object System.Windows.Controls.Separator)) | Out-Null
+    Add-MenuItem '偷吃快捷方式' { $script:canEat = $eatItem.IsChecked } $true $script:canEat | Out-Null
+    $eatItem = $menu.Items[$menu.Items.Count - 1]
+    Add-MenuItem '真吃模式（会移动桌面文件）' {
+        $script:eatRealMode = $realEatItem.IsChecked
+        if ($script:eatRealMode) {
+            Show-Bubble '真吃模式已开：只动桌面上的 .lnk，退出时自动还原' 8000
+        }
+    } $true $script:eatRealMode | Out-Null
+    $realEatItem = $menu.Items[$menu.Items.Count - 1]
+    Add-MenuItem '看看她肚子里有什么' {
+        $items = Get-BellyItems
+        if ($items.Count -eq 0) { Show-Bubble '肚子里空空的' 4000 }
+        else { Show-Bubble ("肚子里有 $($items.Count) 个：" + (($items | ForEach-Object { $_.name }) -join '、')) 8000 }
+    } | Out-Null
+    Add-MenuItem '吐出肚子里的东西' { Restore-Belly | Out-Null } | Out-Null
     $menu.Items.Add((New-Object System.Windows.Controls.Separator)) | Out-Null
     Add-MenuItem '看向鼠标' { $script:followMouse = -not $script:followMouse } | Out-Null
     Add-MenuItem '回到右下角' { $window.Left = $script:work.Right - $window.Width - 60; $window.Top = $script:floorTop } | Out-Null
@@ -656,7 +901,10 @@ try {
         for ($i = 0; $i -lt 20; $i++) { Update-Frame }
         $moved = [Math]::Round([Math]::Abs($window.Left - $before))
         $script:mode = 'idle'
-        "SELFTEST_OK atlas=$(Split-Path $atlasPath -Leaf) cell=${CellWidth}x${CellHeight} cards=$($cells.Length) sounds=$($players.Count) scale=$Scale walk_moved_px=$moved window=$($window.Width)x$($window.Height) ai=$($script:aiReady) bubble_ok=$([bool]$bubbleText)"
+        # 偷吃功能的自检：只验证函数可用与桌面可读，绝不真的移动文件
+        $shortcutCount = (Get-DesktopShortcuts).Count
+        $bellyCount = (Get-BellyItems).Count
+        "SELFTEST_OK atlas=$(Split-Path $atlasPath -Leaf) cell=${CellWidth}x${CellHeight} cards=$($cells.Length) sounds=$($players.Count) scale=$Scale walk_moved_px=$moved window=$($window.Width)x$($window.Height) ai=$($script:aiReady) bubble_ok=$([bool]$bubbleText) desktop_lnk=$shortcutCount belly=$bellyCount leftover_restored=$($script:leftoverRestored) usage='$((Get-UsageText))'"
         exit 0
     }
 
@@ -677,6 +925,7 @@ try {
         "  base_url = $($script:aiConfig.base_url)"
         "  model = $($script:aiConfig.model)"
         "  api_key = $(if ([string]::IsNullOrWhiteSpace($script:aiConfig.api_key)) { '(空)' } else { '已填写（长度 ' + $script:aiConfig.api_key.Length + '）' })"
+        "  余额端点（按服务商推断，失败会自动依次重试）= $(Get-BalanceEndpoints -join '  ->  ')"
         if (-not $script:aiReady) { "SKIPPED 未启用或未填 api_key；请先编辑 ai-config.json"; exit 2 }
         $messages = @(
             @{ role = 'system'; content = $script:aiConfig.system_prompt },
@@ -714,6 +963,8 @@ try {
     $window.Add_Closed({
         Write-Log 'closed'
         $timer.Stop()
+        # 退出前把肚子里的快捷方式还回去，绝不带走用户的东西
+        try { Restore-Belly -Quiet | Out-Null } catch { Write-Log "exit restore failed: $($_.Exception.Message)" }
         try { if ($bubble.IsVisible) { $bubble.Close() } } catch { }
         if ($null -ne $synth) { try { $synth.Dispose() } catch { } }
         if ($null -ne $script:http) { try { $script:http.Dispose() } catch { } }
