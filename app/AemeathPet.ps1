@@ -32,7 +32,9 @@ param(
     # 命令行拉取当前提供方的模型列表（等价于点界面里的「获取可用模型」）
     [switch]$ListModels,
     # 命令行验证 Provider ID 规则（调用界面同一套校验函数）
-    [string]$ValidateProviderId = ''
+    [string]$ValidateProviderId = '',
+    # 命令行查询余额（与界面同一条代码路径）
+    [switch]$TestBalance
 )
 
 $ErrorActionPreference = 'Stop'
@@ -191,7 +193,7 @@ try {
     }
 
     function Invoke-Eat {
-        $shortcuts = Get-DesktopShortcuts
+        $shortcuts = @(Get-DesktopShortcuts)
         if ($shortcuts.Count -eq 0) {
             Show-Bubble '桌上没有快捷方式可以吃…' 4000
             return
@@ -713,7 +715,11 @@ try {
 
     function Start-BalanceQuery {
         if (-not $script:aiReady) { Show-Bubble (Get-AiStatusText) 6000; return }
-        if ($script:httpBusy) { return }
+        if ($script:httpBusy) {
+            # 原来这里静默返回，气泡会一直停在“查询中…”，看起来像失败
+            Show-Bubble '上一个请求还没结束，稍等一下再点' 5000
+            return
+        }
         $script:httpBusy = $true
         $script:httpTask = $null
         $script:balanceTried = @()
@@ -722,8 +728,10 @@ try {
             $script:http.Timeout = [TimeSpan]::FromSeconds(15)
             $script:http.DefaultRequestHeaders.Authorization =
                 New-Object System.Net.Http.Headers.AuthenticationHeaderValue('Bearer', $script:aiProvider.api_key)
-            $endpoints = Get-BalanceEndpoints
-            $script:balanceTried = $endpoints
+            $endpoints = @(Get-BalanceEndpoints)
+            $script:balanceTried = @($endpoints)
+            # 注意 @()：函数返回单元素数组会被 PowerShell 解包成字符串，
+            # 那样 $endpoints[0] 取到的是第一个字符而不是第一个元素。
             $script:httpTask = $script:http.GetAsync($endpoints[0])
             $script:httpTaskKind = 'balance'
             $script:httpTaskQueue = @($endpoints | Select-Object -Skip 1)
@@ -731,6 +739,8 @@ try {
         }
         catch {
             $script:httpBusy = $false
+            $script:balancePending = ''
+            Write-Log "balance request failed: $($_.Exception.Message)"
             Show-Bubble "查询失败：$($_.Exception.Message)" 8000
         }
     }
@@ -782,6 +792,280 @@ try {
         }
     }
 
+    # ── 写代码 / 接 Agent ──
+    # 三种引擎：对话模型（只写给你看）、Codex CLI（只读沙箱）、Codex/Claude CLI（可写）
+    # 明确不使用 codex 的 --dangerously-bypass-approvals-and-sandbox
+    $script:codeWindow = $null
+    $script:codeOutputBox = $null
+    $script:codeStatusText = $null
+    $script:codePromptBox = $null
+    $script:codeDirBox = $null
+    $script:codeEngineCombo = $null
+    $script:codeProc = $null
+    $script:codeOutFile = ''
+    $script:codeErrFile = ''
+    $script:codeRunning = $false
+
+    function Get-AgentExecutable([string]$Name) {
+        $c = Get-Command $Name -ErrorAction SilentlyContinue
+        if ($c) { return $c.Source }
+        return $null
+    }
+
+    function Get-CodeEngines {
+        $list = New-Object System.Collections.ArrayList
+        [void]$list.Add('对话模型（只写代码，不改文件）')
+        $codex = Get-AgentExecutable 'codex'
+        if ($codex) {
+            [void]$list.Add('Codex CLI（只读沙箱，不改文件）')
+            [void]$list.Add('Codex CLI（可写工作目录，会改文件）')
+        }
+        $claude = Get-AgentExecutable 'claude'
+        if ($claude) { [void]$list.Add('Claude CLI（print 模式）') }
+        return $list.ToArray()
+    }
+
+    function Get-AgentWorkspace {
+        $dir = Join-Path $scriptRoot 'agent-workspace'
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+        return $dir
+    }
+
+    function Show-CodeWindow {
+        if ($null -ne $script:codeWindow) {
+            $script:codeWindow.Show()
+            $script:codeWindow.Activate()
+            return
+        }
+        $win = New-Object System.Windows.Window
+        $win.Title = '写代码 / 接 Agent'
+        $win.Width = 720
+        $win.Height = 620
+        $win.Topmost = $false
+        $win.WindowStartupLocation = [System.Windows.WindowStartupLocation]::CenterScreen
+
+        $panel = New-Object System.Windows.Controls.StackPanel
+        $panel.Margin = New-Object System.Windows.Thickness(14)
+
+        $lb1 = New-Object System.Windows.Controls.TextBlock
+        $lb1.Text = '要写什么代码？（一句话说清需求）'
+        $lb1.FontWeight = [System.Windows.FontWeights]::Bold
+        $panel.Children.Add($lb1) | Out-Null
+        $promptBox = New-Object System.Windows.Controls.TextBox
+        $promptBox.AcceptsReturn = $true
+        $promptBox.Height = 64
+        $promptBox.TextWrapping = [System.Windows.TextWrapping]::Wrap
+        $promptBox.VerticalScrollBarVisibility = [System.Windows.Controls.ScrollBarVisibility]::Auto
+        $promptBox.Margin = New-Object System.Windows.Thickness(0, 4, 0, 8)
+        $panel.Children.Add($promptBox) | Out-Null
+
+        $row2 = New-Object System.Windows.Controls.DockPanel
+        $engineCombo = New-Object System.Windows.Controls.ComboBox
+        $engineCombo.Width = 320
+        foreach ($e in Get-CodeEngines) { [void]$engineCombo.Items.Add($e) }
+        $engineCombo.SelectedIndex = 0
+        $engineLabel = New-Object System.Windows.Controls.TextBlock
+        $engineLabel.Text = '引擎：'
+        $engineLabel.VerticalAlignment = [System.Windows.HorizontalAlignment]::Center
+        [System.Windows.Controls.DockPanel]::SetDock($engineLabel, [System.Windows.Controls.Dock]::Left)
+        $row2.Children.Add($engineLabel) | Out-Null
+        $row2.Children.Add($engineCombo) | Out-Null
+        $panel.Children.Add($row2) | Out-Null
+
+        $lb2 = New-Object System.Windows.Controls.TextBlock
+        $lb2.Text = '工作目录（仅 CLI 引擎用到）'
+        $lb2.Margin = New-Object System.Windows.Thickness(0, 8, 0, 2)
+        $panel.Children.Add($lb2) | Out-Null
+        $dirBox = New-Object System.Windows.Controls.TextBox
+        $dirBox.Text = Get-AgentWorkspace
+        $panel.Children.Add($dirBox) | Out-Null
+
+        $runRow = New-Object System.Windows.Controls.StackPanel
+        $runRow.Orientation = [System.Windows.Controls.Orientation]::Horizontal
+        $runRow.Margin = New-Object System.Windows.Thickness(0, 10, 0, 6)
+        $runBtn = New-Object System.Windows.Controls.Button
+        $runBtn.Content = '开始'
+        $runBtn.Width = 90
+        $runBtn.Margin = New-Object System.Windows.Thickness(0, 0, 8, 0)
+        $copyBtn = New-Object System.Windows.Controls.Button
+        $copyBtn.Content = '复制结果'
+        $copyBtn.Width = 90
+        $copyBtn.Margin = New-Object System.Windows.Thickness(0, 0, 8, 0)
+        $saveBtn = New-Object System.Windows.Controls.Button
+        $saveBtn.Content = '保存为文件'
+        $saveBtn.Width = 100
+        $runRow.Children.Add($runBtn) | Out-Null
+        $runRow.Children.Add($copyBtn) | Out-Null
+        $runRow.Children.Add($saveBtn) | Out-Null
+        $panel.Children.Add($runRow) | Out-Null
+
+        $statusText = New-Object System.Windows.Controls.TextBlock
+        $statusText.TextWrapping = [System.Windows.TextWrapping]::Wrap
+        $statusText.Foreground = [System.Windows.Media.Brushes]::DimGray
+        $statusText.Margin = New-Object System.Windows.Thickness(0, 0, 0, 6)
+        $panel.Children.Add($statusText) | Out-Null
+
+        $outBox = New-Object System.Windows.Controls.TextBox
+        $outBox.IsReadOnly = $true
+        $outBox.AcceptsReturn = $true
+        $outBox.FontFamily = New-Object System.Windows.Media.FontFamily('Consolas, Cascadia Mono, monospace')
+        $outBox.FontSize = 12
+        $outBox.TextWrapping = [System.Windows.TextWrapping]::NoWrap
+        $outBox.VerticalScrollBarVisibility = [System.Windows.Controls.ScrollBarVisibility]::Auto
+        $outBox.HorizontalScrollBarVisibility = [System.Windows.Controls.ScrollBarVisibility]::Auto
+        $outBox.Height = 300
+        $panel.Children.Add($outBox) | Out-Null
+
+        $win.Content = $panel
+
+        $copyBtn.Add_Click({
+            if (-not [string]::IsNullOrWhiteSpace($outBox.Text)) {
+                try { [System.Windows.Clipboard]::SetText($outBox.Text); $statusText.Text = '已复制到剪贴板' } catch { }
+            }
+        })
+        $saveBtn.Add_Click({
+            if ([string]::IsNullOrWhiteSpace($outBox.Text)) { return }
+            $dlg = New-Object Microsoft.Win32.SaveFileDialog
+            $dlg.FileName = 'code.txt'
+            $dlg.Filter = '文本 (*.txt)|*.txt|所有文件 (*.*)|*.*'
+            if ($dlg.ShowDialog() -eq $true) {
+                Set-Content -LiteralPath $dlg.FileName -Value $outBox.Text -Encoding UTF8
+                $statusText.Text = "已保存：$($dlg.FileName)"
+            }
+        })
+        $runBtn.Add_Click({ Start-CodeRun })
+
+        $script:codeWindow = $win
+        $script:codeOutputBox = $outBox
+        $script:codeStatusText = $statusText
+        $script:codePromptBox = $promptBox
+        $script:codeDirBox = $dirBox
+        $script:codeEngineCombo = $engineCombo
+        $win.Add_Closed({ $script:codeWindow = $null; $script:codeOutputBox = $null })
+        $win.Show() | Out-Null
+    }
+
+    function Start-CodeRun {
+        if ($script:codeRunning) { return }
+        $prompt = $script:codePromptBox.Text.Trim()
+        if ([string]::IsNullOrWhiteSpace($prompt)) { $script:codeStatusText.Text = '先写下需求'; return }
+        $engine = [string]$script:codeEngineCombo.SelectedItem
+        $dir = $script:codeDirBox.Text.Trim()
+        $script:codeOutputBox.Text = ''
+        $script:codeRunning = $true
+
+        if ($engine -like '对话模型*') {
+            if (-not $script:aiReady) { $script:codeStatusText.Text = (Get-AiStatusText); $script:codeRunning = $false; return }
+            $script:codeStatusText.Text = "正在请求对话模型（$($script:aiProvider.model)）…"
+            $sys = '你是一个严谨的程序员。只输出可直接使用的代码，必要时用一行文字说明用法。代码要完整可运行，不要省略。'
+            $body = @{
+                model      = $script:aiProvider.model
+                messages   = @(
+                    @{ role = 'system'; content = $sys },
+                    @{ role = 'user'; content = $prompt }
+                )
+                max_tokens = 2000
+            } | ConvertTo-Json -Depth 6
+            try {
+                $script:http = New-AiHttpClient
+                $script:http.DefaultRequestHeaders.Authorization =
+                    New-Object System.Net.Http.Headers.AuthenticationHeaderValue('Bearer', $script:aiProvider.api_key)
+                $content = New-Object System.Net.Http.StringContent($body, [System.Text.Encoding]::UTF8, 'application/json')
+                $url = ([string]$script:aiProvider.base_url).TrimEnd('/') + '/chat/completions'
+                $script:httpTask = $script:http.PostAsync($url, $content)
+                $script:httpTaskKind = 'code'
+            }
+            catch {
+                $script:codeStatusText.Text = "请求失败：$($_.Exception.Message)"
+                $script:codeRunning = $false
+            }
+            return
+        }
+
+        # CLI 引擎
+        $exe = $null; $args = @()
+        if ($engine -like 'Codex CLI（只读*') {
+            $exe = Get-AgentExecutable 'codex'
+            $args = @('exec', '-C', $dir, '-s', 'read-only', '--skip-git-repo-check', $prompt)
+        }
+        elseif ($engine -like 'Codex CLI（可写*') {
+            $exe = Get-AgentExecutable 'codex'
+            $args = @('exec', '-C', $dir, '-s', 'workspace-write', '--skip-git-repo-check', $prompt)
+        }
+        elseif ($engine -like 'Claude CLI*') {
+            $exe = Get-AgentExecutable 'claude'
+            $args = @('-p', $prompt)
+        }
+        if (-not $exe) { $script:codeStatusText.Text = '找不到该引擎的可执行文件'; $script:codeRunning = $false; return }
+        if (-not (Test-Path -LiteralPath $dir -PathType Container)) {
+            try { New-Item -ItemType Directory -Force -Path $dir | Out-Null } catch { }
+        }
+
+        $stamp = [DateTime]::Now.ToString('HHmmss')
+        $script:codeOutFile = Join-Path $env:TEMP "aemeath-agent-$stamp.out.txt"
+        $script:codeErrFile = Join-Path $env:TEMP "aemeath-agent-$stamp.err.txt"
+        $script:codeStatusText.Text = "正在运行：$([IO.Path]::GetFileName($exe)) $($args -join ' ')`n（agent 可能要跑一会儿，完成后结果会自动出现）"
+        try {
+            $script:codeProc = Start-Process -FilePath $exe -ArgumentList $args -WorkingDirectory $dir `
+                -RedirectStandardOutput $script:codeOutFile -RedirectStandardError $script:codeErrFile `
+                -NoNewWindow -PassThru
+        }
+        catch {
+            $script:codeStatusText.Text = "启动失败：$($_.Exception.Message)"
+            $script:codeRunning = $false
+        }
+    }
+
+    function Complete-CodeRun {
+        # 只负责 CLI 引擎；对话模型那条走 Complete-CodeChat
+        $proc = $script:codeProc
+        if ($null -eq $proc) { return }
+        if (-not $proc.HasExited) {
+            if ($null -ne $script:codeStatusText) { $script:codeStatusText.Text = '运行中…' }
+            return
+        }
+        $script:codeRunning = $false
+        $script:codeProc = $null
+        $out = if (Test-Path -LiteralPath $script:codeOutFile) { Get-Content -LiteralPath $script:codeOutFile -Raw -Encoding UTF8 } else { '' }
+        $err = if (Test-Path -LiteralPath $script:codeErrFile) { Get-Content -LiteralPath $script:codeErrFile -Raw -Encoding UTF8 } else { '' }
+        $text = $out
+        if (-not [string]::IsNullOrWhiteSpace($err)) { $text = "$out`n--- stderr ---`n$err" }
+        if ([string]::IsNullOrWhiteSpace($text)) { $text = "（没有输出；退出码 $($proc.ExitCode)）" }
+        if ($null -ne $script:codeOutputBox) { $script:codeOutputBox.Text = $text }
+        if ($null -ne $script:codeStatusText) { $script:codeStatusText.Text = "完成（退出码 $($proc.ExitCode)）" }
+        Write-Log "agent finished exit=$($proc.ExitCode) out=$($script:codeOutFile)"
+    }
+
+    function Complete-CodeChat {
+        if ($null -eq $script:httpTask) { return }
+        if (-not $script:httpTask.IsCompleted) { return }
+        $task = $script:httpTask
+        $script:httpTask = $null
+        $script:codeRunning = $false
+        try {
+            $response = $task.Result
+            $text = $response.Content.ReadAsStringAsync().Result
+            if (-not $response.IsSuccessStatusCode) {
+                $script:codeStatusText.Text = "HTTP $([int]$response.StatusCode) — $(Get-AiErrorHint ([int]$response.StatusCode) $text)"
+                if ($null -ne $script:codeOutputBox) { $script:codeOutputBox.Text = $text }
+                return
+            }
+            $parsed = $text | ConvertFrom-Json
+            $reply = [string]$parsed.choices[0].message.content
+            if ($parsed.usage) {
+                $p = [int]$parsed.usage.prompt_tokens
+                $c = [int]$parsed.usage.completion_tokens
+                $t = if ($parsed.usage.total_tokens) { [int]$parsed.usage.total_tokens } else { $p + $c }
+                $script:usage.calls++; $script:usage.prompt += $p; $script:usage.completion += $c; $script:usage.total += $t
+                $script:usage.last = [ordered]@{ prompt = $p; completion = $c; total = $t }
+            }
+            if ($null -ne $script:codeOutputBox) { $script:codeOutputBox.Text = $reply.Trim() }
+            $script:codeStatusText.Text = "完成（$(Get-UsageShort)）"
+        }
+        catch {
+            $script:codeStatusText.Text = "解析失败：$($_.Exception.Message)"
+        }
+    }
     function Get-AiStatusText() {
         if ($null -eq $script:aiConfig) { return 'AI：配置文件坏了' }
         if ($null -eq $script:aiProvider) { return 'AI：还没配置提供方（右键 → API 设置）' }
@@ -795,7 +1079,10 @@ try {
             Show-Bubble (Get-AiStatusText) 6000
             return
         }
-        if ($script:httpBusy) { return }
+        if ($script:httpBusy) {
+            Show-Bubble '上一个请求还没结束，稍等一下' 5000
+            return
+        }
         $script:httpBusy = $true
         $script:httpTask = $null
 
@@ -1180,10 +1467,13 @@ try {
     function Update-Frame() {
         $script:frameTick++
 
-        # AI 请求 / 余额查询轮询 + 气泡自动收起（放在最前面，任何状态下都要生效）
+        # AI 请求 / 余额查询 / 写代码 轮询 + 气泡自动收起（放在最前面，任何状态下都要生效）
         if ($null -ne $script:httpTask -and $script:httpTask.IsCompleted) {
-            if ($script:httpTaskKind -eq 'balance') { Complete-BalanceQuery } else { Complete-AiRequest }
+            if ($script:httpTaskKind -eq 'balance') { Complete-BalanceQuery }
+            elseif ($script:httpTaskKind -eq 'code') { Complete-CodeChat }
+            else { Complete-AiRequest }
         }
+        if ($script:codeRunning) { Complete-CodeRun }
         if ($script:bubbleUntil -gt 0 -and [Environment]::TickCount -gt $script:bubbleUntil) {
             $script:bubbleUntil = 0
             if ($bubble.IsVisible) { $bubble.Hide() }
@@ -1390,6 +1680,7 @@ try {
     } $true $false | Out-Null
     $speakItem = $menu.Items[$menu.Items.Count - 1]
     $menu.Items.Add((New-Object System.Windows.Controls.Separator)) | Out-Null
+    Add-MenuItem '写代码 / 接 Agent…' { Show-CodeWindow } | Out-Null
     Add-MenuItem 'API 设置…（自定义提供方）' { Show-ApiSettings } | Out-Null
     Add-MenuItem '和她说句话…' {
         $text = Read-UserText
@@ -1408,6 +1699,27 @@ try {
     Add-MenuItem 'AI 状态' { Show-Bubble (Get-AiStatusText) 6000 } | Out-Null
     Add-MenuItem '查看用量（tokens）' { Show-Bubble (Get-UsageText) 10000 } | Out-Null
     Add-MenuItem '查询余额' { Start-BalanceQuery } | Out-Null
+    Add-MenuItem '诊断：直接测余额' {
+        # 绕开界面状态，直接测一次，并把原始返回写进日志
+        if ($null -eq $script:aiProvider) { Show-Bubble '未配置提供方' 5000; return }
+        Show-Bubble '正在直接查询余额…' 15000
+        try {
+            $url = @(Get-BalanceEndpoints)[0]
+            $r = Invoke-RestMethod -Uri $url -Headers @{ Authorization = "Bearer $($script:aiProvider.api_key)" } -Method Get -TimeoutSec 20
+            $sum = ''
+            if ($r.balance_infos) { $sum = ($r.balance_infos | ForEach-Object { "$($_.total_balance) $($_.currency)" }) -join ' / ' }
+            elseif ($r.balance) { $sum = "$($r.balance)" }
+            if ([string]::IsNullOrWhiteSpace($sum)) { $sum = ($r | ConvertTo-Json -Depth 4 -Compress) }
+            Write-Log "balance direct ok: $url -> $sum"
+            Show-Bubble "余额：$sum" 12000
+        }
+        catch {
+            $code = 0
+            try { $code = [int]$_.Exception.Response.StatusCode } catch { }
+            Write-Log "balance direct failed: $url $code $($_.Exception.Message)"
+            Show-Bubble "查询失败：$(Get-AiErrorHint $code $_.Exception.Message)" 9000
+        }
+    } | Out-Null
     Add-MenuItem '点击显示用量与余额' { $script:clickShowsStatus = $clickStatusItem.IsChecked } $true $script:clickShowsStatus | Out-Null
     $clickStatusItem = $menu.Items[$menu.Items.Count - 1]
     Add-MenuItem '打开 AI 配置（记事本）' {
@@ -1478,7 +1790,11 @@ try {
         Wake-Up
         $wakeOk = -not $script:sleeping
         $script:mode = 'idle'
-        "SELFTEST_OK atlas=$(Split-Path $atlasPath -Leaf) cell=${CellWidth}x${CellHeight} cards=$($cells.Length) sounds=$($players.Count) scale=$Scale walk_moved_px=$moved window=$($window.Width)x$($window.Height) ai=$($script:aiReady) bubble_ok=$([bool]$bubbleText) desktop_lnk=$shortcutCount belly=$bellyCount leftover_restored=$($script:leftoverRestored) usage='$(Get-UsageShort)' balance='$(Get-BalanceShort)' click_status=$($script:clickShowsStatus) emotes=[$($emoteReport -join ' ')] sleep_wake=$($sleepOk -and $wakeOk)"
+        # 写代码 / Agent 自检：只列出可用引擎与工作目录，不启动任何 agent
+        $engines = Get-CodeEngines
+        $workspace = Get-AgentWorkspace
+        $codeReport = "engines=$($engines.Count)[$($engines -join ' | ')] workspace_exists=$(Test-Path $workspace)"
+        "SELFTEST_OK atlas=$(Split-Path $atlasPath -Leaf) cell=${CellWidth}x${CellHeight} cards=$($cells.Length) sounds=$($players.Count) scale=$Scale walk_moved_px=$moved window=$($window.Width)x$($window.Height) ai=$($script:aiReady) bubble_ok=$([bool]$bubbleText) desktop_lnk=$shortcutCount belly=$bellyCount leftover_restored=$($script:leftoverRestored) usage='$(Get-UsageShort)' balance='$(Get-BalanceShort)' click_status=$($script:clickShowsStatus) emotes=[$($emoteReport -join ' ')] sleep_wake=$($sleepOk -and $wakeOk) code=$codeReport"
         exit 0
     }
 
@@ -1514,6 +1830,35 @@ try {
         }
         "拉取失败：$($r.message)"
         'LISTMODELS_FAILED'
+        exit 1
+    }
+
+    if ($TestBalance) {
+        if ($null -eq $script:aiProvider) { 'FAILED 还没配置提供方'; exit 2 }
+        # @() 必须加：单元素数组会被解包成字符串，直接取 [0] 会拿到第一个字符
+        $endpoints = @(Get-BalanceEndpoints)
+        "提供方：$($script:aiProvider._id)  $($script:aiProvider.base_url)"
+        "端点候选（$($endpoints.Count) 个）：$($endpoints -join '  ,  ')"
+        foreach ($ep in $endpoints) {
+            "尝试：$ep"
+            try {
+                $r = Invoke-RestMethod -Uri $ep -Headers @{ Authorization = "Bearer $($script:aiProvider.api_key)" } -Method Get -TimeoutSec 20
+                $sum = ''
+                if ($r.balance_infos) { $sum = ($r.balance_infos | ForEach-Object { "$($_.total_balance) $($_.currency)" }) -join ' / ' }
+                elseif ($r.balance) { $sum = "$($r.balance)" }
+                elseif ($r.data -and $r.data.balance) { $sum = "$($r.data.balance)" }
+                if ([string]::IsNullOrWhiteSpace($sum)) { $sum = ($r | ConvertTo-Json -Depth 4 -Compress) }
+                "余额：$sum"
+                'TESTBALANCE_OK'
+                exit 0
+            }
+            catch {
+                $code = 0
+                try { $code = [int]$_.Exception.Response.StatusCode } catch { }
+                "  失败：$(Get-AiErrorHint $code $_.Exception.Message)"
+            }
+        }
+        'TESTBALANCE_FAILED'
         exit 1
     }
 
