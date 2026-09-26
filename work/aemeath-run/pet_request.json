@@ -1,7 +1,7 @@
 {
   "pet_id": "aemeath",
   "display_name": "aemeath",
-  "description": "A chibi desktop pet inspired by Wuthering Waves character Aemeath, with silver-lilac hair, teal energy accents, and a composed heroic presence.",
+  "description": "A chibi desktop pet inspired by Wuthering Waves character Aemeath, with pastel-pink hair, small cyan crystal hair clips, amber-gold eyes, and a white-and-navy hero dress with gold trim.",
   "created_at": "2026-09-09T12:46:40.214825+00:00",
   "sprite_version_number": 2,
   "atlas": {
@@ -257,10 +257,10 @@
     "name": "magenta",
     "selection": "fallback"
   },
-  "pet_notes": "Wuthering Waves Aemeath-inspired humanoid mascot: compact full-body chibi female hero, silver-lilac layered hair with a distinctive side sweep, cool porcelain skin, navy-white outfit with cyan/teal luminous accents, small geometric energy ornament near the shoulder, calm determined face, subtle cyan particle-like trim but no detached effects. Keep feet grounded, silhouette readable, no weapons, no text, no logos.",
-  "style_preset": "3d-toy",
-  "style_notes": "Polished 3D-toy / soft clay mascot rendering, clean hard-edged chroma background, centered full body, compact silhouette, expressive eyes, consistent identity across animation rows.",
-  "style_contract": "Pet-safe sprite: compact full-body mascot, readable in a 192x208 cell, clear silhouette, simple face, stable palette/materials, and crisp edges for chroma-key extraction. Style `3d-toy`: Stylized 3D toy mascot with smooth rounded forms, simple materials, clear silhouette, and no photoreal complexity. User style notes: Polished 3D-toy / soft clay mascot rendering, clean hard-edged chroma background, centered full body, compact silhouette, expressive eyes, consistent identity across animation rows..",
+  "pet_notes": "Wuthering Waves Aemeath-inspired humanoid mascot: super-deformed Q-version chibi female hero (oversized head about 40 percent of the full figure height, roughly 2.5 heads tall, short stubby arms and legs, small torso), long pastel-pink hair with soft side locks, small compact translucent cyan crystal hair clips sitting flat against the hair (tiny clip-sized ornaments only, never large wings, never oversized headpieces), warm amber-gold eyes, fair skin, white-and-navy hero dress with gold trim, white gloves, navy chest bow with a small gem, white thigh-high stockings, calm friendly face, soft cyan glow accents but no detached effects. Keep feet grounded, silhouette readable, no weapons, no text, no logos.",
+  "style_preset": "sticker",
+  "style_notes": "Clean 2D anime chibi illustration: bold uniform dark outline, flat cel shading with two or three tone steps, large expressive amber eyes with star-shaped highlights, soft pink blush, crisp flat color fills, centered full body, compact silhouette, consistent identity across animation rows.",
+  "style_contract": "Pet-safe sprite: compact full-body mascot, readable in a 192x208 cell, clear silhouette, simple face, stable palette/materials, and crisp edges for chroma-key extraction. Style `sticker`: Polished sticker mascot with bold clean shapes, crisp outline, flat colors, and minimal highlight detail. User style notes: Clean 2D anime chibi illustration, bold uniform dark outline, flat cel shading with only two or three tone steps, large expressive amber eyes with star-shaped highlights, soft pink blush marks, crisp flat color fills, no 3D render, no glossy plastic highlight, no soft gradient, no photorealism..",
   "brand_name": "",
   "brand_brief": "",
   "brand_sources": [],
