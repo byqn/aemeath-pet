@@ -85,10 +85,16 @@ switch ($JobId) {
     }
 }
 
-$job.status = "complete"
-$job.source_path = $outputPath
-$job.completed_at = (Get-Date).ToUniversalTime().ToString("o")
-$job.review_note = $DecisionNote.Trim()
+function Set-ManifestField([object]$Target, [string]$Name, $Value) {
+    # PSCustomObject 上对不存在的属性直接赋值会抛异常，这里统一按需新增。
+    if ($Target.PSObject.Properties[$Name]) { $Target.$Name = $Value }
+    else { $Target | Add-Member -NotePropertyName $Name -NotePropertyValue $Value -Force | Out-Null }
+}
+
+Set-ManifestField $job "status" "complete"
+Set-ManifestField $job "source_path" $outputPath
+Set-ManifestField $job "completed_at" (Get-Date).ToUniversalTime().ToString("o")
+Set-ManifestField $job "review_note" $DecisionNote.Trim()
 $tempManifest = $ManifestPath + ".tmp"
 $manifest | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $tempManifest -Encoding UTF8
 Move-Item -LiteralPath $tempManifest -Destination $ManifestPath -Force
